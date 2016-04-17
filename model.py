@@ -109,13 +109,24 @@ class GP_FANOVA(object):
 
 		# update alpha
 		for i in range(self.k):
-			print i
 			mu,cov = self.alpha_conditional(i)
 			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 			self.parameter_history.loc[self.parameter_history.index[-1],self.alpha_index(i)] = sample
 
 		# update hyperparams
 
-	def sample(n=1):
+	def sample(self,n=1,drop=0):
+		last_drop = self.parameter_history.index[-1]
 		for i in range(n):
 			self.update()
+
+			if drop > 0 and self.parameter_history.index[-1]-last_drop > drop:
+				droppers = self.parameter_history.index[last_drop+1:self.parameter_history.index[-1]].tolist()
+				self.parameter_history = self.parameter_history.drop(droppers)
+				self.parameter_history.index = range(self.parameter_history.shape[0])
+				last_drop = self.parameter_history.index[-1]
+
+	def plot_functions(self):
+		import matplotlib.pyplot as plt
+
+		[plt.plot(self.sample_x,self.parameter_history[self.alpha_index(i)].mean(0)) for i in range(self.k)]
