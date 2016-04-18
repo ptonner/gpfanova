@@ -42,6 +42,8 @@ class GP_FANOVA(object):
 		self.parameter_history.iloc[0,-6:] = 1
 		self.parameter_history.loc[0,['y_sigma']] = .1
 
+		self.parameter_cache = self.parameter_history.iloc[0,:]
+
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.sample_x]
 
@@ -49,23 +51,23 @@ class GP_FANOVA(object):
 		return ['alpha_%d(%lf)'%(k,z) for z in self.sample_x]
 
 	def y_sub_alpha(self):
-		ysa = self.y - np.column_stack([self.parameter_history.loc[self.parameter_history.index[-1],self.alpha_index(i)].T for i in self.effect])
+		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
 		return np.sum(ysa,1)/self.nt
 
 	def y_sub_mu(self,i):
-		ysm = self.y[:,self.effect==i] - self.parameter_history.loc[self.parameter_history.index[-1],self.mu_index()].T.values[:,None]
+		ysm = self.y[:,self.effect==i] - self.parameter_cache[self.mu_index()].values[:,None]
 		return np.sum(ysm,1)/self.nk[i]
 
 	def mu_k(self):
-		sigma,ls = self.parameter_history[['mu_sigma','mu_lengthscale']].iloc[-1,:]
+		sigma,ls = self.parameter_cache[['mu_sigma','mu_lengthscale']]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def alpha_k(self):
-		sigma,ls = self.parameter_history[['alpha_sigma','alpha_lengthscale']].iloc[-1,:]
+		sigma,ls = self.parameter_cache[['alpha_sigma','alpha_lengthscale']]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def y_k(self):
-		sigma,ls = self.parameter_history[['y_sigma','y_lengthscale']].iloc[-1,:]
+		sigma,ls = self.parameter_cache[['y_sigma','y_lengthscale']]
 		# return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 		return GPy.kern.White(self.p,variance=sigma)
 
@@ -80,7 +82,7 @@ class GP_FANOVA(object):
 		if i == self.k-1: # enforce sum to zero constraint
 			mu_alpha = np.zeros(self.sample_n)
 			for j in range(i):
-				mu_alpha = mu_alpha - self.parameter_history[self.alpha_index(j)].iloc[-1,:].values
+				mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
 			return mu_alpha,np.zeros((self.sample_n,self.sample_n))
 
 		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
@@ -90,7 +92,7 @@ class GP_FANOVA(object):
 
 		mu_alpha = np.zeros(self.sample_n)
 		for j in range(i):
-			mu_alpha = mu_alpha - self.parameter_history[self.alpha_index(j)].iloc[-1,:].values
+			mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
 		mu_alpha = mu_alpha / (self.k - i)
 
 		b = self.nk[i]*np.dot(y_k_inv,self.y_sub_mu(i)) + np.dot(k_alpha_inv,mu_alpha)
@@ -100,10 +102,10 @@ class GP_FANOVA(object):
 
 	def update(self):
 
-		new_params = pd.DataFrame(self.parameter_history.iloc[-1,:]).T
-		new_params.index = [self.parameter_history.shape[0]]
-
-		self.parameter_history = self.parameter_history.append(new_params)
+		# new_params = pd.DataFrame(self.parameter_history.iloc[-1,:]).T
+		# new_params.index = [self.parameter_history.shape[0]]
+		#
+		# self.parameter_history = self.parameter_history.append(new_params)
 
 		# update mu
 
@@ -111,20 +113,20 @@ class GP_FANOVA(object):
 		for i in range(self.k):
 			mu,cov = self.alpha_conditional(i)
 			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
-			self.parameter_history.loc[self.parameter_history.index[-1],self.alpha_index(i)] = sample
+			self.parameter_cache.loc[self.alpha_index(i)] = sample
 
 		# update hyperparams
 
-	def sample(self,n=1,drop=0):
-		last_drop = self.parameter_history.index[-1]
-		for i in range(n):
+	def sample(self,n=1,save=0):
+		start = self.parameter_history.index[-1]
+		i = 1
+		while self.parameter_history.shape[0] - start < n:
 			self.update()
 
-			if drop > 0 and self.parameter_history.index[-1]-last_drop > drop:
-				droppers = self.parameter_history.index[last_drop+1:self.parameter_history.index[-1]].tolist()
-				self.parameter_history = self.parameter_history.drop(droppers)
-				self.parameter_history.index = range(self.parameter_history.shape[0])
-				last_drop = self.parameter_history.index[-1]
+			if save == 0 or i % save == 0:
+				self.parameter_history = self.parameter_history.append(self.parameter_cache)
+
+			i+=1
 
 	def plot_functions(self):
 		import matplotlib.pyplot as plt
