@@ -72,7 +72,7 @@ class GP_FANOVA(object):
 		return GPy.kern.White(self.p,variance=sigma)
 
 	def mu_conditional(self):
-		A = self.mu_k().K(self.sample_x) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
+		A = np.linalg.inv(self.mu_k().K(self.sample_x)) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
 		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
 
 		A_inv = np.linalg.inv(A)
@@ -86,7 +86,7 @@ class GP_FANOVA(object):
 			return mu_alpha,np.zeros((self.sample_n,self.sample_n))
 
 		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-		k_alpha_inv = np.linalg.inv(1.*(self.k-i-1)/(self.k-i) * self.alpha_k().K(self.sample_x))
+		k_alpha_inv = np.linalg.inv( 1.*(self.k-i-1)/(self.k-i) * self.alpha_k().K(self.sample_x) )
 
 		A = k_alpha_inv + self.nk[i] * y_k_inv
 
@@ -108,14 +108,23 @@ class GP_FANOVA(object):
 		# self.parameter_history = self.parameter_history.append(new_params)
 
 		# update mu
+		mu,cov = self.mu_conditional()
+		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+		self.parameter_cache.loc[self.mu_index()] = sample
 
 		# update alpha
+		# order = np.
+
 		for i in range(self.k):
 			mu,cov = self.alpha_conditional(i)
 			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 			self.parameter_cache.loc[self.alpha_index(i)] = sample
 
 		# update hyperparams
+
+	def store(self):
+		self.parameter_history = self.parameter_history.append(self.parameter_cache)
+		self.parameter_history.index = range(self.parameter_history.shape[0])
 
 	def sample(self,n=1,save=0):
 		start = self.parameter_history.index[-1]
@@ -124,11 +133,29 @@ class GP_FANOVA(object):
 			self.update()
 
 			if save == 0 or i % save == 0:
-				self.parameter_history = self.parameter_history.append(self.parameter_cache)
+				self.store()
 
 			i+=1
 
 	def plot_functions(self):
 		import matplotlib.pyplot as plt
 
-		[plt.plot(self.sample_x,self.parameter_history[self.alpha_index(i)].mean(0)) for i in range(self.k)]
+		# plt.gca().set_color_cycle(None)
+		colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+
+		for i in range(self.k):
+			mean = (self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)
+			std = self.parameter_history[self.alpha_index(i)].values.std(0)
+			plt.plot(self.sample_x,mean,color=colors[i])
+			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[i])
+		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
+
+		plt.plot(self.sample_x,self.parameter_history[self.mu_index()].mean(0),'k')
+
+	def plot_data(self):
+		import matplotlib.pyplot as plt
+
+		colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+
+		for i in range(self.y.shape[1]):
+			plt.plot(self.x,self.y[:,i],color=colors[self.effect[i]],alpha=.6)
