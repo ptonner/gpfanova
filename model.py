@@ -72,33 +72,49 @@ class GP_FANOVA(object):
 		return GPy.kern.White(self.p,variance=sigma)
 
 	def mu_conditional(self):
-		A = np.linalg.inv(self.mu_k().K(self.sample_x)) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
+		offset = np.eye(self.sample_x.shape[0])*1e-9
+		A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
 		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
-	def alpha_conditional(self,i):
-		if i == self.k-1: # enforce sum to zero constraint
+	def alpha_conditional(self,i,order,params=False):
+		if i == order[-1]: # enforce sum to zero constraint
 			mu_alpha = np.zeros(self.sample_n)
-			for j in range(i):
+			for j in order[:-1]:
 				mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
 			return mu_alpha,np.zeros((self.sample_n,self.sample_n))
 
+		ind = order.tolist().index(i)
+
 		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-		k_alpha_inv = np.linalg.inv( 1.*(self.k-i-1)/(self.k-i) * self.alpha_k().K(self.sample_x) )
+		# k_alpha_inv = np.linalg.inv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x))
+		k_alpha_inv = np.linalg.inv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
+		# k_alpha_inv = np.linalg.pinv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x))
 
 		A = k_alpha_inv + self.nk[i] * y_k_inv
 
 		mu_alpha = np.zeros(self.sample_n)
-		for j in range(i):
+		for j in order[:ind]:
 			mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
-		mu_alpha = mu_alpha / (self.k - i)
+		mu_alpha = mu_alpha / (self.k - ind)
 
 		b = self.nk[i]*np.dot(y_k_inv,self.y_sub_mu(i)) + np.dot(k_alpha_inv,mu_alpha)
+		# b = np.dot(k_alpha_inv,mu_alpha)
+		# b = self.nk[i]*np.dot(y_k_inv,self.y_sub_mu(i))
+
+		if params:
+			return A,b
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
+
+	def update_mu(self):
+
+		mu,cov = self.mu_conditional()
+		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+		self.parameter_cache.loc[self.mu_index()] = sample
 
 	def update(self):
 
@@ -115,8 +131,9 @@ class GP_FANOVA(object):
 		# update alpha
 		# order = np.
 
-		for i in range(self.k):
-			mu,cov = self.alpha_conditional(i)
+		order = np.random.choice(range(self.k),self.k,replace=False)
+		for i in order:
+			mu,cov = self.alpha_conditional(i,order)
 			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 			self.parameter_cache.loc[self.alpha_index(i)] = sample
 
@@ -137,25 +154,28 @@ class GP_FANOVA(object):
 
 			i+=1
 
-	def plot_functions(self):
+	def plot_functions(self,burnin=0):
 		import matplotlib.pyplot as plt
 
 		# plt.gca().set_color_cycle(None)
-		colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+		colors = [u'b', u'g', u'r', u'c', u'm', u'y',]
 
 		for i in range(self.k):
-			mean = (self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)
-			std = self.parameter_history[self.alpha_index(i)].values.std(0)
+			mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
+			std = self.parameter_history[self.alpha_index(i)].values[burnin:,:].std(0)
 			plt.plot(self.sample_x,mean,color=colors[i])
 			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[i])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
 
-		plt.plot(self.sample_x,self.parameter_history[self.mu_index()].mean(0),'k')
+		mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
+		std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
+		plt.plot(self.sample_x,mean,'k')
+		plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
 
 	def plot_data(self):
 		import matplotlib.pyplot as plt
 
-		colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+		colors = [u'b', u'g', u'r', u'c', u'm', u'y']
 
 		for i in range(self.y.shape[1]):
 			plt.plot(self.x,self.y[:,i],color=colors[self.effect[i]],alpha=.6)
