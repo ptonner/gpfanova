@@ -46,8 +46,8 @@ class GP_FANOVA(object):
 				for l in range(self.mk[i]):
 					for m in range(self.mk[k]):
 						ind += self.effect_interaction_index(i,l,k,m)
-				ind += ["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[k]),
-						"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[k])]
+				ind += ["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
+						"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i])]
 
 		ind += ['y_sigma','y_lengthscale']
 
@@ -58,6 +58,8 @@ class GP_FANOVA(object):
 		self.parameter_cache[['mu_sigma','mu_lengthscale','y_sigma','y_lengthscale']] = 1
 		for i in range(self.k):
 			self.parameter_cache[['%s_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
+			for j in range(i):
+				self.parameter_cache[['%s:%s_sigma'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i]),'%s:%s_lengthscale'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i])]] = 1
 		self.parameter_cache['y_sigma'] = .1
 
 		self.parameter_history = pd.DataFrame(columns=ind)
@@ -77,7 +79,7 @@ class GP_FANOVA(object):
 	def offset(self):
 		return 1e-9
 
-	def sample_prior(self):
+	def sample_prior(self,update_data=False):
 		# mean
 		mu,cov = np.zeros(self.n), self.mu_k().K(self.x) + np.eye(self.n)*self.offset()
 		mean = scipy.stats.multivariate_normal.rvs(mu,cov)
@@ -96,16 +98,38 @@ class GP_FANOVA(object):
 				sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 				effects[i][:,j] = sample
 
+		# effect interactions
+		# cheating right now assuming exactly two effects
+		effect_interactions = np.zeros(tuple([self.n]+self.mk))
+		for i in range(self.mk[0]):
+			for j in range(self.mk[1]):
+				if i == self.mk[0]-1:
+					effect_interactions[:,i,j] = -np.sum(effect_interactions[:,:i,j],1)
+					continue
+				if j == self.mk[1]-1:
+					effect_interactions[:,i,j] = -np.sum(effect_interactions[:,i,:j],1)
+					continue
+				mu = np.zeros(self.n)
+				mu -= np.sum(effect_interactions[:,:i,j],1)/(self.mk[0]-i)
+				mu -= np.sum(effect_interactions[:,i,:j],1)/(self.mk[1]-j)
+				cov = 1.*(self.mk[0]-i-1)/(self.mk[0]-i)*(self.mk[1]-j-1)/(self.mk[0]-j) * self.effect_interaction_k(0,1).K(self.x) + np.eye(self.n)*self.offset()
+				effect_interactions[:,i,j] = scipy.stats.multivariate_normal.rvs(mu,cov)
+
 		# noise
 		obs = np.zeros((self.n,self.nt))
 		for i in range(self.nt):
 			mu = mean.copy()
 			for j in range(self.k):
 				mu+=effects[j][:,self.effect[i,j]]
+				for k in range(j):
+					mu+=effect_interactions[:,j,k]
 			cov = self.y_k().K(self.x)
 			obs[:,i] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
-		return mean,effects,obs
+		if update_data:
+			self.y = obs
+
+		return mean,effects,effect_interactions,obs
 
 	def effect_index(self,k,l,):
 		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.sample_x]
@@ -135,8 +159,8 @@ class GP_FANOVA(object):
 		sigma,ls = self.parameter_cache[["%s_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
-	def effect_interaction_k(self,i):
-		sigma,ls = self.parameter_cache[["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j]),"%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j])]]
+	def effect_interaction_k(self,i,j):
+		sigma,ls = self.parameter_cache[["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j]),"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j])]]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def alpha_k(self):
