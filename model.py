@@ -154,23 +154,27 @@ class GP_FANOVA(object):
 
 			i+=1
 
-	def plot_functions(self,burnin=0):
+	def plot_functions(self,plot_mean=True,offset=True,burnin=0):
 		import matplotlib.pyplot as plt
 
 		# plt.gca().set_color_cycle(None)
 		colors = [u'b', u'g', u'r', u'c', u'm', u'y',]
 
 		for i in range(self.k):
-			mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
+			if offset:
+				mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
+			else:
+				mean = (self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
 			std = self.parameter_history[self.alpha_index(i)].values[burnin:,:].std(0)
 			plt.plot(self.sample_x,mean,color=colors[i])
 			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[i])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
 
-		mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
-		std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
-		plt.plot(self.sample_x,mean,'k')
-		plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
+		if plot_mean:
+			mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
+			std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
+			plt.plot(self.sample_x,mean,'k')
+			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
 
 	def plot_data(self):
 		import matplotlib.pyplot as plt
