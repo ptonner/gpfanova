@@ -18,7 +18,7 @@ def mu_sample():
 
 mu_sample()
 
-ma = 2
+ma = 4
 alpha_mu = np.zeros(n)
 alpha_cov = GPy.kern.RBF(p).K(x)
 alpha_samples = np.zeros((n,ma))
