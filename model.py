@@ -28,13 +28,14 @@ class GP_FANOVA(object):
 
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
-		# self.nk = {[(i,[sum(self.effect[:,i] == j) for j in range(self.mk[i])]) for i in range(self.k)]} # number of observations for each effect level
+		self.nk = dict([(i,[sum(self.effect[:,i] == j) for j in range(self.mk[i])]) for i in range(self.k)]) # number of observations for each effect level
 		self.nt = self.y.shape[1]
 
-		alpha_cols = []
-		for i in range(self.k):
-			alpha_cols = alpha_cols + ['alpha_%d(%lf)'%(i,z) for z in self.sample_x]
+		# alpha_cols = []
+		# for i in range(self.k):
+		# 	alpha_cols = alpha_cols + ['alpha_%d(%lf)'%(i,z) for z in self.sample_x]
 
+		# build the index for the parameter cache
 		ind = self.mu_index() + ['mu_sigma','mu_lengthscale']
 		for i in range(self.k):
 			for j in range(self.mk[i]):
@@ -77,6 +78,7 @@ class GP_FANOVA(object):
 		# self.parameter_cache = self.parameter_history.iloc[0,:]
 
 	def offset(self):
+		"""offset for the calculation of covariance matrices inverse"""
 		return 1e-9
 
 	def sample_prior(self,update_data=False):
@@ -132,6 +134,7 @@ class GP_FANOVA(object):
 		return mean,effects,effect_interactions,obs
 
 	def effect_index(self,k,l,):
+		"""lth sample of kth effect"""
 		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.sample_x]
 
 	def effect_interaction_index(self,k,l,m,n):
@@ -147,9 +150,44 @@ class GP_FANOVA(object):
 		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
 		return np.sum(ysa,1)/self.nt
 
+	def y_sub_effects(self):
+
+		yse = self.y.copy()
+		for i in range(self.k):
+			yse = yse - np.column_stack([self.parameter_cache[self.effect_index(i,k)] for k in self.effect[:,i]])
+
+			for j in range(i):
+				yse = yse - np.column_stack([self.parameter_cache[self.effect_interaction_index(i,k,j,l)] for k,l in zip(self.effect[:,i],self.effect[:,j])])
+
+		return np.mean(yse,1)
+
 	def y_sub_mu(self,i):
 		ysm = self.y[:,self.effect==i] - self.parameter_cache[self.mu_index()].values[:,None]
 		return np.sum(ysm,1)/self.nk[i]
+
+	def y_sub_mu_for_effect(self,i,j):
+		ysm = self.y[:,self.effect[:,i]==j] - self.parameter_cache[self.mu_index()].values[:,None]
+
+		# remove interaction effects
+		for k in range(self.k):
+			if k == i:
+				continue
+			for l in range(self.mk[k]):
+				if i > k:
+					ysm = ysm - self.parameter_cache[self.effect_interaction_index(i,j,k,l)].values[:,None]
+				else:
+					ysm = ysm - self.parameter_cache[self.effect_interaction_index(k,l,i,j)].values[:,None]
+
+		# return np.sum(ysm,1)/self.nk[i]
+		return np.mean(ysm,1)
+
+	def y_sub_mu_for_interaction(self,i,j,k,l):
+
+		ysm = self.y[:,np.all((self.effect[:,i]==j,self.effect[:,k]==l),0)] - self.parameter_cache[self.mu_index()].values[:,None]
+
+		ysm = ysm - self.parameter_cache[self.effect_index(i,j)].values[:,None] - self.parameter_cache[self.effect_index(k,l)].values[:,None]
+
+		return ysm.mean(1)
 
 	def mu_k(self):
 		sigma,ls = self.parameter_cache[['mu_sigma','mu_lengthscale']]
@@ -175,7 +213,48 @@ class GP_FANOVA(object):
 	def mu_conditional(self):
 		offset = np.eye(self.sample_x.shape[0])*1e-9
 		A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
-		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
+		# b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
+		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_effects())
+
+		A_inv = np.linalg.inv(A)
+		return np.dot(A_inv,b), A_inv
+
+	def effect_conditional(self,i,j):
+		mu = np.zeros(self.sample_n)
+		for k in range(j):
+			mu -= self.parameter_cache[self.effect_index(i,k)]
+		mu /= (self.mk[i] - j)
+
+		if j == self.mk[i] - 1: # we're fuckin dun
+			return mu,np.zeros((self.sample_n,self.sample_n))
+
+		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+
+		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
+		k_effect_inv = np.linalg.inv(1.*(self.mk[i]-j-1)/(self.mk[i] - j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
+
+		A = k_effect_inv + self.nk[i][j] * y_k_inv
+		b = self.nk[i][j]*np.dot(y_k_inv,self.y_sub_mu_for_effect(i,j)) + np.dot(k_effect_inv,mu)
+
+		A_inv = np.linalg.inv(A)
+		return np.dot(A_inv,b), A_inv
+
+	def interaction_conditional(self,i,j,k,l):
+		mu = np.zeros(self.sample_n)
+		for k in range(j):
+			mu -= self.parameter_cache[self.effect_interaction_index(i,j,k,l)]
+		mu /= (self.mk[i] - j)
+
+		if j == self.mk[i] - 1: # we're fuckin dun
+			return mu,np.zeros((self.sample_n,self.sample_n))
+
+		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+
+		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
+		k_effect_inv = np.linalg.inv(1.*(self.mk[i]-j-1)/(self.mk[i] - j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
+
+		A = k_effect_inv + self.nk[i][j] * y_k_inv
+		b = self.nk[i][j]*np.dot(y_k_inv,self.y_sub_mu_for_effect(i,j)) + np.dot(k_effect_inv,mu)
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
@@ -284,10 +363,15 @@ class GP_FANOVA(object):
 		colors = [u'b', u'g', u'r', u'c', u'm', u'y']
 		cmaps = [plt.get_cmap(c) for c in ["Blues",'Greens','Reds']]
 
+		# first effect is color,
+		# second effect is subplot
+
 		for i in range(self.y.shape[1]):
-			if self.k == 2:
-				c = cmaps[self.effect[i,0]](1.*(self.effect[i,1] + offset)/(self.mk[1]+2*offset))
-			else:
-				c = colors(self.effect[i,0])
+			if self.k >= 2:
+				plt.subplot(1,self.mk[1],self.effect[i,1]+1)
+				# c = cmaps[self.effect[i,0]](1.*(self.effect[i,1] + offset)/(self.mk[1]+2*offset))
+			# else:
+			c = colors[self.effect[i,0]]
 
 			plt.plot(self.x,self.y[:,i],color=c,alpha=alpha)
+			plt.ylim(self.y.min(),self.y.max())
