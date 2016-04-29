@@ -138,6 +138,11 @@ class GP_FANOVA(object):
 		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.sample_x]
 
 	def effect_interaction_index(self,k,l,m,n):
+		if k < m:
+			t1,t2 = k,l
+			k,l = m,n
+			m,n = t1,t2
+
 		return ['%s_%d:%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,GP_FANOVA.EFFECT_SUFFIXES[m],n,z) for z in self.sample_x]
 
 	def mu_index(self):
@@ -240,21 +245,36 @@ class GP_FANOVA(object):
 		return np.dot(A_inv,b), A_inv
 
 	def interaction_conditional(self,i,j,k,l):
-		mu = np.zeros(self.sample_n)
-		for k in range(j):
-			mu -= self.parameter_cache[self.effect_interaction_index(i,j,k,l)]
-		mu /= (self.mk[i] - j)
+		sub_effect_1,sub_effect_2 = np.zeros(self.sample_n), np.zeros(self.sample_n)
 
-		if j == self.mk[i] - 1: # we're fuckin dun
-			return mu,np.zeros((self.sample_n,self.sample_n))
+		# if i < k: # swapperino
+		# 	temp1,temp2 = i,j
+		# 	i,j = k,l
+		# 	k,l = temp1,temp2
 
-		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+		for m in range(j):
+			sub_effect_1 -= self.parameter_cache[self.effect_interaction_index(i,m,k,l)]
+		for n in range(l):
+			sub_effect_2 -= self.parameter_cache[self.effect_interaction_index(i,j,k,n)]
+
+		# print sub_effect_1, sub_effect_2
+
+		if j == self.mk[i] - 1:
+			return sub_effect_1,np.zeros((self.sample_n,self.sample_n))
+		elif l == self.mk[k] - 1:
+			return sub_effect_2,np.zeros((self.sample_n,self.sample_n))
+		else:
+			mu = - sub_effect_1 - sub_effect_2
+
+		mu -= mu/(self.mk[i]-j)/(self.mk[k]-l)
+		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j)*(self.mk[k]-l-1)/(self.mk[k]-l) * self.effect_interaction_k(i,k).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+
+		# print mu,cov
 
 		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-		k_effect_inv = np.linalg.inv(1.*(self.mk[i]-j-1)/(self.mk[i] - j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
 
-		A = k_effect_inv + self.nk[i][j] * y_k_inv
-		b = self.nk[i][j]*np.dot(y_k_inv,self.y_sub_mu_for_effect(i,j)) + np.dot(k_effect_inv,mu)
+		A = cov + self.nk[i][j] * self.nk[k][l] * y_k_inv
+		b = self.nk[i][j]*self.nk[k][l]*np.dot(y_k_inv,self.y_sub_mu_for_interaction(i,j,k,l)) + np.dot(cov,mu)
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
@@ -309,22 +329,37 @@ class GP_FANOVA(object):
 		self.parameter_cache.loc[self.mu_index()] = sample
 
 		# update alpha
-		# order = np.
+		# order = np.random.choice(range(self.k),self.k,replace=False)
+		# for i in order:
+		# 	mu,cov = self.alpha_conditional(i,order)
+		# 	sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+		# 	self.parameter_cache.loc[self.alpha_index(i)] = sample
 
-		order = np.random.choice(range(self.k),self.k,replace=False)
-		for i in order:
-			mu,cov = self.alpha_conditional(i,order)
-			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
-			self.parameter_cache.loc[self.alpha_index(i)] = sample
+		# update dem effex
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				mu,cov = self.effect_conditional(i,j)
+				sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+				self.parameter_cache.loc[self.effect_index(i,j)] = sample
+
+		# update dem interacshuns
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				for k in range(i+1,self.k):
+					for l in range(self.mk[k]):
+						# print i,j,k,l
+						mu,cov = self.interaction_conditional(i,j,k,l)
+						sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+						self.parameter_cache.loc[self.effect_interaction_index(i,j,k,l)] = sample
 
 		# update hyperparams
 
 	def store(self):
-		self.parameter_history = self.parameter_history.append(self.parameter_cache)
+		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
 
 	def sample(self,n=1,save=0):
-		start = self.parameter_history.index[-1]
+		start = self.parameter_history.shape[0]
 		i = 1
 		while self.parameter_history.shape[0] - start < n:
 			self.update()
