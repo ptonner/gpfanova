@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import GPy, scipy
+import GPy, scipy, time
 
 class GP_FANOVA(object):
 
@@ -103,19 +103,20 @@ class GP_FANOVA(object):
 		# effect interactions
 		# cheating right now assuming exactly two effects
 		effect_interactions = np.zeros(tuple([self.n]+self.mk))
-		for i in range(self.mk[0]):
-			for j in range(self.mk[1]):
-				if i == self.mk[0]-1:
-					effect_interactions[:,i,j] = -np.sum(effect_interactions[:,:i,j],1)
-					continue
-				if j == self.mk[1]-1:
-					effect_interactions[:,i,j] = -np.sum(effect_interactions[:,i,:j],1)
-					continue
-				mu = np.zeros(self.n)
-				mu -= np.sum(effect_interactions[:,:i,j],1)/(self.mk[0]-i)
-				mu -= np.sum(effect_interactions[:,i,:j],1)/(self.mk[1]-j)
-				cov = 1.*(self.mk[0]-i-1)/(self.mk[0]-i)*(self.mk[1]-j-1)/(self.mk[0]-j) * self.effect_interaction_k(0,1).K(self.x) + np.eye(self.n)*self.offset()
-				effect_interactions[:,i,j] = scipy.stats.multivariate_normal.rvs(mu,cov)
+		if self.k > 1:
+			for i in range(self.mk[0]):
+				for j in range(self.mk[1]):
+					if i == self.mk[0]-1:
+						effect_interactions[:,i,j] = -np.sum(effect_interactions[:,:i,j],1)
+						continue
+					if j == self.mk[1]-1:
+						effect_interactions[:,i,j] = -np.sum(effect_interactions[:,i,:j],1)
+						continue
+					mu = np.zeros(self.n)
+					mu -= np.sum(effect_interactions[:,:i,j],1)/(self.mk[0]-i)
+					mu -= np.sum(effect_interactions[:,i,:j],1)/(self.mk[1]-j)
+					cov = 1.*(self.mk[0]-i-1)/(self.mk[0]-i)*(self.mk[1]-j-1)/(self.mk[0]-j) * self.effect_interaction_k(0,1).K(self.x) + np.eye(self.n)*self.offset()
+					effect_interactions[:,i,j] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
 		# noise
 		obs = np.zeros((self.n,self.nt))
@@ -150,6 +151,33 @@ class GP_FANOVA(object):
 
 	def alpha_index(self,k,):
 		return ['alpha_%d(%lf)'%(k,z) for z in self.sample_x]
+
+	def likelihood(self,eval=True):
+		n = self.n*self.nt
+		# mu,cov = np.zeros(n), self.y_k().K(np.tile(self.x,self.nt).T.ravel()[:,None])
+		mu = np.zeros(n)
+
+		for i in range(self.nt):
+			mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.mu_index()]
+
+			for k in range(self.k):
+				mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.effect_index(k,self.effect[i,k])]
+
+		# norm = scipy.stats.multivariate_normal(mu,cov)
+		if eval:
+			y = self.y.T.ravel()
+
+			prod = 0
+			for i in range(y.shape[0]):
+				# pdf = scipy.stats.norm.logpdf(y[i],loc=mu[i],scale=np.sqrt(cov[i,i]))
+				pdf = scipy.stats.norm.logpdf(y[i],loc=mu[i],scale=np.sqrt(self.parameter_cache['y_sigma']))
+				prod += pdf
+
+				# print pdf, prod
+
+			return prod# norm.pdf(y)
+
+		return mu,cov
 
 	def y_sub_alpha(self):
 		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
@@ -327,6 +355,7 @@ class GP_FANOVA(object):
 		mu,cov = self.mu_conditional()
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 		self.parameter_cache.loc[self.mu_index()] = sample
+		# print self.parameter_cache.loc[self.mu_index()]
 
 		# update alpha
 		# order = np.random.choice(range(self.k),self.k,replace=False)
@@ -353,21 +382,57 @@ class GP_FANOVA(object):
 						self.parameter_cache.loc[self.effect_interaction_index(i,j,k,l)] = sample
 
 		# update hyperparams
+		# mu
+
+
+		delta = 1
+		j1 = scipy.stats.uniform(max(1e-6,self.parameter_cache['mu_lengthscale']-delta), min(10,self.parameter_cache['mu_lengthscale']+delta))
+		ls = j1.rvs()
+		j2 = scipy.stats.uniform(max(1e-6,ls-delta), min(10,ls+delta))
+
+		oldls = self.parameter_cache['mu_lengthscale']
+		oldll = self.likelihood()
+		self.parameter_cache['mu_lengthscale'] = ls
+		newll = self.likelihood()
+
+		logr = newll + j2.logpdf(oldls) - oldll - j1.logpdf(ls)
+		r = np.exp(logr)
+
+		# print r
+		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
+			self.parameter_cache['mu_lengthscale'] = oldls
+
+
+
+
+		# effects
+		# interactions
 
 	def store(self):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
 
-	def sample(self,n=1,save=0):
+	def sample(self,n=1,save=0,verbose=False):
 		start = self.parameter_history.shape[0]
 		i = 1
+
+		start_time = iter_time = time.time()
 		while self.parameter_history.shape[0] - start < n:
 			self.update()
 
 			if save == 0 or i % save == 0:
 				self.store()
 
+				if verbose:
+					j = self.parameter_history.shape[0] - start
+
+					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,1.*j/n,'%',(time.time()-iter_time)/60)
+					iter_time = time.time()
+
 			i+=1
+
+		if verbose:
+			print "%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60)
 
 	def plot_functions(self,plot_mean=True,offset=True,burnin=0):
 		import matplotlib.pyplot as plt
@@ -377,13 +442,15 @@ class GP_FANOVA(object):
 		cmaps = ["Blues",'Greens','Reds']
 
 		for i in range(self.k):
-			if offset:
-				mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
-			else:
-				mean = (self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
-			std = self.parameter_history[self.alpha_index(i)].values[burnin:,:].std(0)
-			plt.plot(self.sample_x,mean,color=colors[i])
-			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[i])
+
+			for j in range(self.mk[i]):
+				if offset:
+					mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.effect_index(i,j)].values[burnin:,:]).mean(0)
+				else:
+					mean = (self.parameter_history[self.effect_index(i,j)].values[burnin:,:]).mean(0)
+				std = self.parameter_history[self.alpha_index(i)].values[burnin:,:].std(0)
+				plt.plot(self.sample_x,mean,color=colors[j+sum(self.mk[:i])])
+				plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j+sum(self.mk[:i])])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
 
 		if plot_mean:
