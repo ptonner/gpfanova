@@ -77,9 +77,12 @@ class GP_FANOVA(object):
 		#
 		# self.parameter_cache = self.parameter_history.iloc[0,:]
 
+		# hack out a static inverse covariance matrix, for speedtests
+		# self.k_effect_inv = np.linalg.inv(self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
+
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
-		return 1e-9
+		return 1e-5
 
 	def sample_prior(self,update_data=False):
 		# mean
@@ -163,21 +166,36 @@ class GP_FANOVA(object):
 			for k in range(self.k):
 				mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.effect_index(k,self.effect[i,k])]
 
-		# norm = scipy.stats.multivariate_normal(mu,cov)
+				# add interaction
+
 		if eval:
 			y = self.y.T.ravel()
 
 			prod = 0
 			for i in range(y.shape[0]):
-				# pdf = scipy.stats.norm.logpdf(y[i],loc=mu[i],scale=np.sqrt(cov[i,i]))
 				pdf = scipy.stats.norm.logpdf(y[i],loc=mu[i],scale=np.sqrt(self.parameter_cache['y_sigma']))
 				prod += pdf
-
-				# print pdf, prod
 
 			return prod# norm.pdf(y)
 
 		return mu,cov
+
+	def mu_likelihood(self):
+		mu = np.zeros(self.sample_n)
+		cov = self.mu_k().K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+		return scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.mu_index()],mu,cov)
+
+	def effect_likelihood(self,i):
+		ll = 1
+		for j in range(self.mk[i]):
+			mu,cov = self.effect_parameters(i,j)
+
+			try:
+				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_index(i,j)],mu,cov)
+			except np.linalg.LinAlgError:
+				print i,j
+
+		return ll
 
 	def y_sub_alpha(self):
 		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
@@ -245,12 +263,30 @@ class GP_FANOVA(object):
 
 	def mu_conditional(self):
 		offset = np.eye(self.sample_x.shape[0])*1e-9
-		A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
+
+		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
+
+		# A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
 		# b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
-		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_effects())
+
+		A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * y_k_inv
+		b = self.nt*np.dot(y_k_inv,self.y_sub_effects())
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
+
+	def effect_parameters(self,i,j):
+		mu = np.zeros(self.sample_n)
+		for k in range(j):
+			mu -= self.parameter_cache[self.effect_index(i,k)]
+		mu /= (self.mk[i] - j)
+
+		# if j == self.mk[i] - 1: # we're fuckin dun
+		# 	return mu,np.zeros((self.sample_n,self.sample_n))
+
+		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+
+		return mu,cov
 
 	def effect_conditional(self,i,j):
 		mu = np.zeros(self.sample_n)
@@ -264,7 +300,9 @@ class GP_FANOVA(object):
 		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
 
 		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
+
 		k_effect_inv = np.linalg.inv(1.*(self.mk[i]-j-1)/(self.mk[i] - j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
+		# k_effect_inv = self.k_effect_inv*1.*(self.mk[i] - j)/(self.mk[i]-j-1)
 
 		A = k_effect_inv + self.nk[i][j] * y_k_inv
 		b = self.nk[i][j]*np.dot(y_k_inv,self.y_sub_mu_for_effect(i,j)) + np.dot(k_effect_inv,mu)
@@ -344,25 +382,49 @@ class GP_FANOVA(object):
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 		self.parameter_cache.loc[self.mu_index()] = sample
 
-	def update(self):
+	def metroplis_hastings_sample(self,_min,_max,delta,parameter,likelihood):
+		j1 = scipy.stats.uniform(max(_min,self.parameter_cache[parameter]-delta), min(_max,self.parameter_cache[parameter]+delta))
+		new_param = j1.rvs()
+		j2 = scipy.stats.uniform(max(_min,new_param-delta), min(_max,new_param+delta))
 
-		# new_params = pd.DataFrame(self.parameter_history.iloc[-1,:]).T
-		# new_params.index = [self.parameter_history.shape[0]]
-		#
-		# self.parameter_history = self.parameter_history.append(new_params)
+		old_param = self.parameter_cache[parameter]
+		oldll = likelihood()
+		self.parameter_cache[parameter] = new_param
+		newll = likelihood()
+
+		logr = newll + j2.logpdf(old_param) - oldll - j1.logpdf(new_param)
+		r = np.exp(logr)
+
+		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
+			self.parameter_cache[parameter] = old_param
+
+	def mu_metropolis_hastings(self):
+
+		# lengthscale
+		_min,_max,delta = 1e-6,100,10
+		j1 = scipy.stats.uniform(max(_min,self.parameter_cache['mu_lengthscale']-delta), min(_max,self.parameter_cache['mu_lengthscale']+delta))
+		ls = j1.rvs()
+		j2 = scipy.stats.uniform(max(_min,ls-delta), min(_max,ls+delta))
+
+		oldls = self.parameter_cache['mu_lengthscale']
+		oldll = self.mu_likelihood()
+		self.parameter_cache['mu_lengthscale'] = ls
+		newll = self.mu_likelihood()
+
+		logr = newll + j2.logpdf(oldls) - oldll - j1.logpdf(ls)
+		r = np.exp(logr)
+
+		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
+			self.parameter_cache['mu_lengthscale'] = oldls
+
+	def update(self):
+		"""Sample parameters from posterior."""
 
 		# update mu
 		mu,cov = self.mu_conditional()
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
 		self.parameter_cache.loc[self.mu_index()] = sample
 		# print self.parameter_cache.loc[self.mu_index()]
-
-		# update alpha
-		# order = np.random.choice(range(self.k),self.k,replace=False)
-		# for i in order:
-		# 	mu,cov = self.alpha_conditional(i,order)
-		# 	sample = scipy.stats.multivariate_normal.rvs(mu,cov)
-		# 	self.parameter_cache.loc[self.alpha_index(i)] = sample
 
 		# update dem effex
 		for i in range(self.k):
@@ -382,30 +444,18 @@ class GP_FANOVA(object):
 						self.parameter_cache.loc[self.effect_interaction_index(i,j,k,l)] = sample
 
 		# update hyperparams
+		# likelihood
+		self.metroplis_hastings_sample(1e-6,100,1,'y_sigma',self.likelihood)
+
 		# mu
-
-
-		delta = 1
-		j1 = scipy.stats.uniform(max(1e-6,self.parameter_cache['mu_lengthscale']-delta), min(10,self.parameter_cache['mu_lengthscale']+delta))
-		ls = j1.rvs()
-		j2 = scipy.stats.uniform(max(1e-6,ls-delta), min(10,ls+delta))
-
-		oldls = self.parameter_cache['mu_lengthscale']
-		oldll = self.likelihood()
-		self.parameter_cache['mu_lengthscale'] = ls
-		newll = self.likelihood()
-
-		logr = newll + j2.logpdf(oldls) - oldll - j1.logpdf(ls)
-		r = np.exp(logr)
-
-		# print r
-		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
-			self.parameter_cache['mu_lengthscale'] = oldls
-
-
-
+		self.metroplis_hastings_sample(1e-6,100,10,'mu_lengthscale',self.mu_likelihood)
+		self.metroplis_hastings_sample(1e-6,100,10,'mu_sigma',self.mu_likelihood)
 
 		# effects
+		for i in range(self.k):
+			self.metroplis_hastings_sample(1e-6,100,10,"%s_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i],lambda: self.effect_likelihood(i))
+			self.metroplis_hastings_sample(1e-6,100,10,"%s_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],lambda: self.effect_likelihood(i))
+
 		# interactions
 
 	def store(self):
@@ -426,7 +476,7 @@ class GP_FANOVA(object):
 				if verbose:
 					j = self.parameter_history.shape[0] - start
 
-					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,1.*j/n,'%',(time.time()-iter_time)/60)
+					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60)
 					iter_time = time.time()
 
 			i+=1
