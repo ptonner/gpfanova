@@ -4,7 +4,7 @@ import GPy, scipy
 
 class Base(object):
 
-	EFFECT_SUFFIXES = ['alpha','beta','gamma']
+	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
 	def __init__(self,data,x,y,effect,replicate,sample_x):
 		""" Base model for the GP FANOVA framework.
@@ -56,6 +56,7 @@ class Base(object):
 		self.parameter_cache = pd.Series(np.zeros(len(ind)),
 											index=ind)
 
+		# set some initial values
 		self.parameter_cache[['mu_sigma','mu_lengthscale','y_sigma','y_lengthscale']] = 1
 		for i in range(self.k):
 			self.parameter_cache[['%s_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
