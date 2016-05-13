@@ -1,56 +1,41 @@
 import pandas as pd
 import numpy as np
 import GPy, scipy
+from patsy.contrasts import Helmert
 
-class Base(object):
+class GP_FANOVA(object):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,data,x,y,effect,replicate,sample_x):
+	def __init__(self,x,y,effect):
 		""" Base model for the GP FANOVA framework.
+
+		Input must be of the form:
+		x: n x p
+		y: n x r
+		effect: r x k
+
+		where n is the number of sample points, p is the input dimension,
+		r is the number of replicates, and k is the number of effects.
 		"""
 
-		self.data = data
-
 		# store indexers
-		self.x_index = x # independent variables
-		self.y_index = y # dependent variables
-		self.effect_index = effect # effect variables
-		self.replicate_index = replicate # replicate information
+		self.x = x # independent variables
+		self.y = y # dependent variables
+		self.effect = effect # effect variables
 
-		# store dataframe slices
-		self.x = self.data[self.x_index]
-		self.y = self.data[self.y_index]
-		self.effect = self.data[self.effect_index]
-		self.replicate = self.data[self.replicate_index]
-
-		self.sample_x = sample_x
-
-		self.n = data.shape[0] # this is no longer correct
-		self.sample_n = self.sample_x.shape[0]
+		self.n = self.x.shape[0]
+		assert self.y.shape[0] == self.n, 'x and y must have same first dimension shape!'
 		self.p = self.x.shape[1]
 
-		self.k = len(self.effect) # number of effects
+		self.r = self.nt = self.y.shape[1]
+		assert self.r == self.effect.shape[0], 'y second dimension must match effect first dimension'
+
+		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
-		self.nk = dict([(i,[sum(self.effect[:,i] == j) for j in range(self.mk[i])]) for i in range(self.k)]) # number of observations for each effect level
-		self.nt = self.y.shape[1]
+		#self.nk = dict([(i,[sum(self.effect[:,i] == j) for j in range(self.mk[i])]) for i in range(self.k)]) # number of observations for each effect level
 
-		# build the index for the parameter cache
-		ind = self.mu_index() + ['mu_sigma','mu_lengthscale']
-		for i in range(self.k):
-			for j in range(self.mk[i]):
-				ind += self.effect_index(i,j)
-			ind += ["%s_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
-
-			# add interaction samples
-			for k in range(i):
-				for l in range(self.mk[i]):
-					for m in range(self.mk[k]):
-						ind += self.effect_interaction_index(i,l,k,m)
-				ind += ["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
-						"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i])]
-
-		ind += ['y_sigma','y_lengthscale']
+		ind = self.build_index()
 
 		# print self.sample_n*(1+sum(self.mk))+4+self.k*2, len(ind)
 		self.parameter_cache = pd.Series(np.zeros(len(ind)),
@@ -59,12 +44,35 @@ class Base(object):
 		# set some initial values
 		self.parameter_cache[['mu_sigma','mu_lengthscale','y_sigma','y_lengthscale']] = 1
 		for i in range(self.k):
-			self.parameter_cache[['%s_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
+			self.parameter_cache[['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
 			for j in range(i):
-				self.parameter_cache[['%s:%s_sigma'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i]),'%s:%s_lengthscale'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i])]] = 1
+				self.parameter_cache[['(%s:%s)*_sigma'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i]),'(%s:%s)*_lengthscale'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i])]] = 1
 		self.parameter_cache['y_sigma'] = .1
 
 		self.parameter_history = pd.DataFrame(columns=ind)
+
+		# contrasts
+		self.contrasts = [Helmert().code_without_intercept(range(self.mk[i])).matrix for i in range(self.k)]
+
+	def build_index(self):
+		# build the index for the parameter cache
+		ind = self.mu_index() + ['mu_sigma','mu_lengthscale']
+		for i in range(self.k):
+			for j in range(self.mk[i]-1):
+				ind += self.effect_contrast_index(i,j)
+			ind += ["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
+
+			# add interaction samples
+			for k in range(i):
+				for l in range(self.mk[i]-1):
+					for m in range(self.mk[k])-1:
+						ind += self.effect_interaction_contrast_index(i,l,k,m)
+				ind += ["(%s:%s)*_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
+						"(%s:%s)*_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i])]
+
+		ind += ['y_sigma','y_lengthscale']
+
+		return ind
 
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
@@ -125,27 +133,55 @@ class Base(object):
 
 		return mean,effects,effect_interactions,obs
 
-	def effect_index(self,k,l,):
+	def effect_contrast_index(self,k,l,):
 		"""lth sample of kth effect"""
-		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.sample_x]
+		return ['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
 
-	def effect_interaction_index(self,k,l,m,n):
+	def effect_interaction_contrast_index(self,k,l,m,n):
 		if k < m:
-			t1,t2 = k,l
-			k,l = m,n
-			m,n = t1,t2
+			return effect_interaction_contrast_index(m,n,k,l)
 
-		return ['%s_%d:%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,GP_FANOVA.EFFECT_SUFFIXES[m],n,z) for z in self.sample_x]
+		return ['(%s_%d:%s_%d)*(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,GP_FANOVA.EFFECT_SUFFIXES[m],n,z) for z in self.x]
 
 	def mu_index(self):
-		return ['mu(%lf)'%z for z in self.sample_x]
+		return ['mu(%lf)'%z for z in self.x]
 
-	def alpha_index(self,k,):
-		return ['alpha_%d(%lf)'%(k,z) for z in self.sample_x]
+	def effect_contrast_array(self,i,k=None):
+		a = np.zeros((self.n,self.mk[i]-1))
+		for j in range(self.mk[i]-1):
+			a[:,j] = self.parameter_cache[self.effect_contrast_index(i,j)]
+		return a
 
-	def y_sub_alpha(self):
-		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
-		return np.sum(ysa,1)/self.nt
+	def effect_contrast_conditional_params(self,i,j):
+		m = np.zeros(self.n)
+		obs = np.zeros(self.n) # number of observations at each timepoint
+
+		for k in range(self.mk[i]):
+			if self.contrasts[i][k,j] == 0:
+				continue
+
+			reps = np.where(self.effect[:,i]==k)[0]
+			temp = []
+			for r in reps:
+				temp2 = np.zeros(self.n)
+				for l in range(self.mk[i]-1):
+					if l == j:
+						continue
+					temp2 += self.contrasts[i][k,l] * self.parameter_cache[self.effect_contrast_index(i,l)]
+				temp.append(self.y[:,r] - self.parameter_cache[self.mu_index()] - temp2)
+
+				obs += 1 # all timepoints observed, need to update for nan's
+			temp = np.array(temp)/self.contrasts[i][k,j]
+			m += temp.mean(0)
+		m /= self.mk[i]
+
+		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x)*obs)
+
+		A = obs_cov_inv + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
+		b = np.dot(obs_cov_inv,m)
+
+		A_inv = np.linalg.inv(A)
+		return np.dot(A_inv,b), A_inv
 
 	def y_sub_effects(self):
 
@@ -190,8 +226,8 @@ class Base(object):
 		sigma,ls = self.parameter_cache[['mu_sigma','mu_lengthscale']]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
-	def effect_k(self,i):
-		sigma,ls = self.parameter_cache[["%s_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
+	def effect_contrast_k(self,i):
+		sigma,ls = self.parameter_cache[["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def effect_interaction_k(self,i,j):
