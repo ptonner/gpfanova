@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import GPy, scipy
+import GPy, scipy, time
 from patsy.contrasts import Helmert
 
 class GP_FANOVA(object):
@@ -52,7 +52,8 @@ class GP_FANOVA(object):
 		self.parameter_history = pd.DataFrame(columns=ind)
 
 		# contrasts
-		self.contrasts = [Helmert().code_without_intercept(range(self.mk[i])).matrix for i in range(self.k)]
+		# self.contrasts = [Sum().code_without_intercept(range(self.mk[i])).matrix*np.sqrt(1.*(self.mk[i]-1)/self.mk[i]) for i in range(self.k)]
+		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
 
 	def build_index(self):
 		# build the index for the parameter cache
@@ -73,6 +74,39 @@ class GP_FANOVA(object):
 		ind += ['y_sigma','y_lengthscale']
 
 		return ind
+
+	def effect_contrast_matrix(self,i):
+		h = Helmert().code_without_intercept(range(self.mk[i])).matrix
+		h /= h.shape[1]
+
+		v = 1.*(h.shape[0]-1)/h.shape[0]
+
+		b = np.zeros(h.shape[1])
+		b[-1] = np.sqrt(v)
+
+		ind = range(h.shape[1]-1)
+		ind.reverse()
+
+		# compute column scale base on previous column scalings
+		for j in ind:
+			b[j] = np.sqrt((v-np.dot(h[j+1,:],b)**2)/h[j+1,j]**2)
+
+		h = h*b
+
+		# reverse rows and columns
+		ind = range(h.shape[1])
+		ind.reverse()
+		h = h[:,ind]
+
+		ind = range(h.shape[0])
+		ind.reverse()
+		h = h[ind,:]
+
+		assert np.allclose(np.sum(h**2,1),[v]*h.shape[0]), 'single row constraint fail! '+str(h)
+		assert np.allclose(np.sum((h[:-1,:]*h[1:,:]),1),[-1./h.shape[0]]*(h.shape[1]-1)), 'cross row constraint fail! '+str(h)
+
+		return h
+
 
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
@@ -146,81 +180,77 @@ class GP_FANOVA(object):
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.x]
 
-	def effect_contrast_array(self,i,k=None):
+	def effect_contrast_array(self,i,history=None):
 		a = np.zeros((self.n,self.mk[i]-1))
 		for j in range(self.mk[i]-1):
-			a[:,j] = self.parameter_cache[self.effect_contrast_index(i,j)]
+			if history is None:
+				a[:,j] = self.parameter_cache[self.effect_contrast_index(i,j)]
+			else:
+				a[:,j] = self.parameter_history.loc[history,self.effect_contrast_index(i,j)]
 		return a
 
 	def effect_contrast_conditional_params(self,i,j):
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
 
+		contrasts = self.effect_contrast_array(i)
+
+		tot = 0
 		for k in range(self.mk[i]):
 			if self.contrasts[i][k,j] == 0:
 				continue
+			tot+=1
 
 			reps = np.where(self.effect[:,i]==k)[0]
 			temp = []
 			for r in reps:
-				temp2 = np.zeros(self.n)
-				for l in range(self.mk[i]-1):
-					if l == j:
-						continue
-					temp2 += self.contrasts[i][k,l] * self.parameter_cache[self.effect_contrast_index(i,l)]
-				temp.append(self.y[:,r] - self.parameter_cache[self.mu_index()] - temp2)
+
+				resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][self.effect[r,i],:])
+				resid += contrasts[:,j] * self.contrasts[i][self.effect[r,i],j]
+				temp.append(resid)
+
+				# temp2 = np.zeros(self.n)
+				# for l in range(self.mk[i]-1):
+				# 	if l == j:
+				# 		continue
+				# 	temp2 += self.contrasts[i][k,l] * self.parameter_cache[self.effect_contrast_index(i,l)]
+				# temp.append(self.y[:,r] - self.parameter_cache[self.mu_index()] - temp2)
 
 				obs += 1 # all timepoints observed, need to update for nan's
 			temp = np.array(temp)/self.contrasts[i][k,j]
+
 			m += temp.mean(0)
-		m /= self.mk[i]
+		#m /= self.mk[i]
+		m /= np.sum(self.contrasts[i][k,:] != 0)#tot # how many effects involved?
 
-		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x)*obs)
+		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
 
-		A = obs_cov_inv + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
-		b = np.dot(obs_cov_inv,m)
+		A = obs_cov_inv*obs + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
+		b = obs*np.dot(obs_cov_inv,m)
 
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
-	def y_sub_effects(self):
+	def mu_conditional_params(self):
+		m = np.zeros(self.n)
+		obs = np.zeros(self.n) # number of observations at each timepoint
 
-		yse = self.y.copy()
-		for i in range(self.k):
-			yse = yse - np.column_stack([self.parameter_cache[self.effect_index(i,k)] for k in self.effect[:,i]])
+		y_effect = np.zeros((self.n,self.r))
+		for r in range(self.r):
+			obs += 1 # all timepoints observed, need to update for nan's
+			for i in range(self.k):
+				y_effect[:,r] = self.y[:,r] - np.dot(self.effect_contrast_array(i), self.contrasts[i][self.effect[r,i]])
 
-			for j in range(i):
-				yse = yse - np.column_stack([self.parameter_cache[self.effect_interaction_index(i,k,j,l)] for k,l in zip(self.effect[:,i],self.effect[:,j])])
+				# need to do interaction here
 
-		return np.mean(yse,1)
+		m = np.mean(y_effect,1)
+		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
 
-	def y_sub_mu(self,i):
-		ysm = self.y[:,self.effect==i] - self.parameter_cache[self.mu_index()].values[:,None]
-		return np.sum(ysm,1)/self.nk[i]
+		A = obs*obs_cov_inv + np.linalg.inv(self.mu_k().K(self.x) + np.eye(self.n)*self.offset())
+		b = obs*np.dot(obs_cov_inv,m)
 
-	def y_sub_mu_for_effect(self,i,j):
-		ysm = self.y[:,self.effect[:,i]==j] - self.parameter_cache[self.mu_index()].values[:,None]
-
-		# remove interaction effects
-		for k in range(self.k):
-			if k == i:
-				continue
-			for l in range(self.mk[k]):
-				if i > k:
-					ysm = ysm - self.parameter_cache[self.effect_interaction_index(i,j,k,l)].values[:,None]
-				else:
-					ysm = ysm - self.parameter_cache[self.effect_interaction_index(k,l,i,j)].values[:,None]
-
-		# return np.sum(ysm,1)/self.nk[i]
-		return np.mean(ysm,1)
-
-	def y_sub_mu_for_interaction(self,i,j,k,l):
-
-		ysm = self.y[:,np.all((self.effect[:,i]==j,self.effect[:,k]==l),0)] - self.parameter_cache[self.mu_index()].values[:,None]
-
-		ysm = ysm - self.parameter_cache[self.effect_index(i,j)].values[:,None] - self.parameter_cache[self.effect_index(k,l)].values[:,None]
-
-		return ysm.mean(1)
+		A_inv = np.linalg.inv(A)
+		return np.dot(A_inv,b), A_inv
 
 	def mu_k(self):
 		sigma,ls = self.parameter_cache[['mu_sigma','mu_lengthscale']]
@@ -243,119 +273,38 @@ class GP_FANOVA(object):
 		# return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 		return GPy.kern.White(self.p,variance=sigma)
 
-	def mu_conditional(self):
-		offset = np.eye(self.sample_x.shape[0])*1e-9
-		A = np.linalg.inv(self.mu_k().K(self.sample_x) + offset) + self.nt * np.linalg.inv(self.y_k().K(self.sample_x))
-		# b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_alpha())
-		b = self.nt*np.dot(np.linalg.inv(self.y_k().K(self.sample_x)),self.y_sub_effects())
+	def metroplis_hastings_sample(self,_min,_max,delta,parameter,likelihood):
+		j1 = scipy.stats.uniform(max(_min,self.parameter_cache[parameter]-delta), min(_max,self.parameter_cache[parameter]+delta))
+		new_param = j1.rvs()
+		j2 = scipy.stats.uniform(max(_min,new_param-delta), min(_max,new_param+delta))
 
-		A_inv = np.linalg.inv(A)
-		return np.dot(A_inv,b), A_inv
+		old_param = self.parameter_cache[parameter]
+		oldll = likelihood()
+		self.parameter_cache[parameter] = new_param
+		newll = likelihood()
 
-	def effect_conditional(self,i,j):
-		mu = np.zeros(self.sample_n)
-		for k in range(j):
-			mu -= self.parameter_cache[self.effect_index(i,k)]
-		mu /= (self.mk[i] - j)
+		logr = newll + j2.logpdf(old_param) - oldll - j1.logpdf(new_param)
+		r = np.exp(logr)
 
-		if j == self.mk[i] - 1: # we're fuckin dun
-			return mu,np.zeros((self.sample_n,self.sample_n))
+		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
+			self.parameter_cache[parameter] = old_param
 
-		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
-
-		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-		k_effect_inv = np.linalg.inv(1.*(self.mk[i]-j-1)/(self.mk[i] - j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
-
-		A = k_effect_inv + self.nk[i][j] * y_k_inv
-		b = self.nk[i][j]*np.dot(y_k_inv,self.y_sub_mu_for_effect(i,j)) + np.dot(k_effect_inv,mu)
-
-		A_inv = np.linalg.inv(A)
-		return np.dot(A_inv,b), A_inv
-
-	def interaction_conditional(self,i,j,k,l):
-		sub_effect_1,sub_effect_2 = np.zeros(self.sample_n), np.zeros(self.sample_n)
-
-		# if i < k: # swapperino
-		# 	temp1,temp2 = i,j
-		# 	i,j = k,l
-		# 	k,l = temp1,temp2
-
-		for m in range(j):
-			sub_effect_1 -= self.parameter_cache[self.effect_interaction_index(i,m,k,l)]
-		for n in range(l):
-			sub_effect_2 -= self.parameter_cache[self.effect_interaction_index(i,j,k,n)]
-
-		# print sub_effect_1, sub_effect_2
-
-		if j == self.mk[i] - 1:
-			return sub_effect_1,np.zeros((self.sample_n,self.sample_n))
-		elif l == self.mk[k] - 1:
-			return sub_effect_2,np.zeros((self.sample_n,self.sample_n))
-		else:
-			mu = - sub_effect_1 - sub_effect_2
-
-		mu -= mu/(self.mk[i]-j)/(self.mk[k]-l)
-		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j)*(self.mk[k]-l-1)/(self.mk[k]-l) * self.effect_interaction_k(i,k).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
-
-		# print mu,cov
-
-		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-
-		A = cov + self.nk[i][j] * self.nk[k][l] * y_k_inv
-		b = self.nk[i][j]*self.nk[k][l]*np.dot(y_k_inv,self.y_sub_mu_for_interaction(i,j,k,l)) + np.dot(cov,mu)
-
-		A_inv = np.linalg.inv(A)
-		return np.dot(A_inv,b), A_inv
-
-	def alpha_conditional(self,i,order,params=False):
-		if i == order[-1]: # enforce sum to zero constraint
-			mu_alpha = np.zeros(self.sample_n)
-			for j in order[:-1]:
-				mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
-			return mu_alpha,np.zeros((self.sample_n,self.sample_n))
-
-		ind = order.tolist().index(i)
-
-		y_k_inv = np.linalg.inv(self.y_k().K(self.sample_x))
-		# k_alpha_inv = np.linalg.inv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x))
-		k_alpha_inv = np.linalg.inv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x) + np.eye(self.sample_x.shape[0])*1e-9)
-		# k_alpha_inv = np.linalg.pinv(1.*(self.k-ind-1)/(self.k-ind) * self.alpha_k().K(self.sample_x))
-
-		A = k_alpha_inv + self.nk[i] * y_k_inv
-
-		mu_alpha = np.zeros(self.sample_n)
-		for j in order[:ind]:
-			mu_alpha = mu_alpha - self.parameter_cache[self.alpha_index(j)].values
-		mu_alpha = mu_alpha / (self.k - ind)
-
-		b = self.nk[i]*np.dot(y_k_inv,self.y_sub_mu(i)) + np.dot(k_alpha_inv,mu_alpha)
-		# b = np.dot(k_alpha_inv,mu_alpha)
-		# b = self.nk[i]*np.dot(y_k_inv,self.y_sub_mu(i))
-
-		if params:
-			return A,b
-
-		A_inv = np.linalg.inv(A)
-		return np.dot(A_inv,b), A_inv
-
-	def update_mu(self):
-
-		mu,cov = self.mu_conditional()
+	def gibbs_sample(self,param_fxn,parameters):
+		mu,cov = param_fxn()
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
-		self.parameter_cache.loc[self.mu_index()] = sample
+		self.parameter_cache[parameters] = sample
 
 	def update(self):
 
-		# new_params = pd.DataFrame(self.parameter_history.iloc[-1,:]).T
-		# new_params.index = [self.parameter_history.shape[0]]
-		#
-		# self.parameter_history = self.parameter_history.append(new_params)
-
 		# update mu
-		mu,cov = self.mu_conditional()
-		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
-		self.parameter_cache.loc[self.mu_index()] = sample
-		# print self.parameter_cache.loc[self.mu_index()]
+		self.gibbs_sample(self.mu_conditional_params,self.mu_index())
+
+		for i in range(self.k):
+			for j in range(self.mk[i]-1):
+				self.gibbs_sample(lambda: self.effect_contrast_conditional_params(i,j),
+									self.effect_contrast_index(i,j))
+
+		return
 
 		# update alpha
 		# order = np.random.choice(range(self.k),self.k,replace=False)
@@ -387,16 +336,36 @@ class GP_FANOVA(object):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
 
-	def sample(self,n=1,save=0):
+	def sample(self,n=1,save=0,verbose=False):
 		start = self.parameter_history.shape[0]
 		i = 1
+
+		start_time = iter_time = time.time()
 		while self.parameter_history.shape[0] - start < n:
 			self.update()
 
 			if save == 0 or i % save == 0:
 				self.store()
 
+				if verbose:
+					j = self.parameter_history.shape[0] - start
+
+					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60)
+					iter_time = time.time()
+
 			i+=1
+
+		if verbose:
+			print "%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60)
+
+	def effect_samples(self,i,j):
+		samples = []
+
+		for h in range(self.parameter_history.shape[0]):
+			samples.append(np.dot(self.effect_contrast_array(i,h),self.contrasts[i][j,:]))
+
+		return np.array(samples)
+
 
 	def plot_functions(self,plot_mean=True,offset=True,burnin=0):
 		import matplotlib.pyplot as plt
@@ -406,20 +375,22 @@ class GP_FANOVA(object):
 		cmaps = ["Blues",'Greens','Reds']
 
 		for i in range(self.k):
-			if offset:
-				mean = (self.parameter_history[self.mu_index()].values[burnin:,:] + self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
-			else:
-				mean = (self.parameter_history[self.alpha_index(i)].values[burnin:,:]).mean(0)
-			std = self.parameter_history[self.alpha_index(i)].values[burnin:,:].std(0)
-			plt.plot(self.sample_x,mean,color=colors[i])
-			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[i])
+			for j in range(self.mk[i]):
+				samples = self.effect_samples(i,j)[burnin:,:]
+				if offset:
+					samples += self.parameter_history[self.mu_index()].values[burnin:,:]
+				mean = samples.mean(0)
+
+				std = samples.std(0)
+				plt.plot(self.x,mean,color=colors[j])
+				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
 
 		if plot_mean:
 			mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
 			std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
-			plt.plot(self.sample_x,mean,'k')
-			plt.fill_between(self.sample_x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
+			plt.plot(self.x,mean,'k')
+			plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
 
 	def plot_data(self,alpha=1,offset=1):
 		import matplotlib.pyplot as plt
