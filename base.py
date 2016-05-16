@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
 import GPy, scipy, time
-from patsy.contrasts import Helmert
+from patsy.contrasts import Helmert, Sum
 
 class GP_FANOVA(object):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect):
+	def __init__(self,x,y,effect,contrast=None):
 		""" Base model for the GP FANOVA framework.
 
 		Input must be of the form:
@@ -52,8 +52,12 @@ class GP_FANOVA(object):
 		self.parameter_history = pd.DataFrame(columns=ind)
 
 		# contrasts
-		# self.contrasts = [Sum().code_without_intercept(range(self.mk[i])).matrix*np.sqrt(1.*(self.mk[i]-1)/self.mk[i]) for i in range(self.k)]
-		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
+		if contrast is None:
+			self.contrasts = [self.effect_contrast_matrix_sum(i) for i in range(self.k)]
+		elif contrast == "helmert":
+			self.contrasts = [self.effect_contrast_matrix_helmert(i) for i in range(self.k)]
+		else:
+			self.contrasts = [self.effect_contrast_matrix_sum(i) for i in range(self.k)]
 
 	def build_index(self):
 		# build the index for the parameter cache
@@ -75,7 +79,12 @@ class GP_FANOVA(object):
 
 		return ind
 
-	def effect_contrast_matrix(self,i):
+	def effect_contrast_matrix_sum(self,i):
+		h = Sum().code_without_intercept(range(self.mk[i])).matrix
+		
+		return h
+
+	def effect_contrast_matrix_helmert(self,i):
 		h = Helmert().code_without_intercept(range(self.mk[i])).matrix
 		h /= h.shape[1]
 
