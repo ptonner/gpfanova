@@ -190,38 +190,50 @@ class GP_FANOVA(object):
 		return a
 
 	def effect_contrast_conditional_params(self,i,j):
+		"""compute the conditional mean and covariance of an effect contrast function"""
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
 
 		contrasts = self.effect_contrast_array(i)
 
 		tot = 0
-		for k in range(self.mk[i]):
-			if self.contrasts[i][k,j] == 0:
+		for r in range(self.r):
+			e = self.effect[r,i]
+			if self.contrasts[i][e,j] == 0: # don't use this observation
 				continue
-			tot+=1
+			obs += ~np.isnan(self.y[:,r])
+			tot += 1
 
-			reps = np.where(self.effect[:,i]==k)[0]
-			temp = []
-			for r in reps:
+			resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][e,:])
 
-				resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][self.effect[r,i],:])
-				resid += contrasts[:,j] * self.contrasts[i][self.effect[r,i],j]
-				temp.append(resid)
+			# add back in this contrast
+			resid += contrasts[:,j] * self.contrasts[i][e,j]
 
-				# temp2 = np.zeros(self.n)
-				# for l in range(self.mk[i]-1):
-				# 	if l == j:
-				# 		continue
-				# 	temp2 += self.contrasts[i][k,l] * self.parameter_cache[self.effect_contrast_index(i,l)]
-				# temp.append(self.y[:,r] - self.parameter_cache[self.mu_index()] - temp2)
+			# scale by contrast value
+			resid /= self.contrasts[i][e,j]
 
-				obs += 1 # all timepoints observed, need to update for nan's
-			temp = np.array(temp)/self.contrasts[i][k,j]
+			m+= resid
+		m /= tot
 
-			m += temp.mean(0)
-		#m /= self.mk[i]
-		m /= np.sum(self.contrasts[i][k,:] != 0)#tot # how many effects involved?
+		# tot = 0
+		# for k in range(self.mk[i]):
+		# 	if self.contrasts[i][k,j] == 0:
+		# 		continue
+		# 	tot+=1
+		#
+		# 	reps = np.where(self.effect[:,i]==k)[0]
+		# 	temp = []
+		# 	for r in reps:
+		#
+		# 		resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][self.effect[r,i],:])
+		# 		resid += contrasts[:,j] * self.contrasts[i][self.effect[r,i],j]
+		# 		temp.append(resid)
+		#
+		# 		obs += 1 # all timepoints observed, need to update for nan's
+		# 	temp = np.array(temp)/self.contrasts[i][k,j]
+		#
+		# 	m += temp.mean(0)
+		# m /= np.sum(self.contrasts[i][k,:] != 0)#tot # how many effects involved?
 
 		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
 
@@ -379,9 +391,10 @@ class GP_FANOVA(object):
 				samples = self.effect_samples(i,j)[burnin:,:]
 				if offset:
 					samples += self.parameter_history[self.mu_index()].values[burnin:,:]
-				mean = samples.mean(0)
 
+				mean = samples.mean(0)
 				std = samples.std(0)
+
 				plt.plot(self.x,mean,color=colors[j])
 				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
