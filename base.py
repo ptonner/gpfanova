@@ -89,7 +89,7 @@ class GP_FANOVA(object):
 
 		# compute column scale base on previous column scalings
 		for j in ind:
-			b[j] = np.sqrt((v-np.dot(h[j+1,:],b)**2)/h[j+1,j]**2)
+			b[j] = np.sqrt((v-np.dot(h[j+1,:]**2,b**2))/(h[j+1,j]**2))
 
 		h = h*b
 
@@ -102,8 +102,10 @@ class GP_FANOVA(object):
 		ind.reverse()
 		h = h[ind,:]
 
-		assert np.allclose(np.sum(h**2,1),[v]*h.shape[0]), 'single row constraint fail! '+str(h)
-		assert np.allclose(np.sum((h[:-1,:]*h[1:,:]),1),[-1./h.shape[0]]*(h.shape[1]-1)), 'cross row constraint fail! '+str(h)
+		if not np.allclose(np.sum(h**2,1),[v]*h.shape[0]):
+			print 'single row constraint fail! '+str(h)
+			return h
+		assert np.allclose(np.sum((h[:-1,:]*h[1:,:]),1),[-1./h.shape[0]]*(h.shape[1])), 'cross row constraint fail! '+str(h)
 
 		return h
 
@@ -404,6 +406,23 @@ class GP_FANOVA(object):
 			std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
 			plt.plot(self.x,mean,'k')
 			plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
+
+	def plot_contrasts(self,burnin=0):
+		import matplotlib.pyplot as plt
+
+		# plt.gca().set_color_cycle(None)
+		colors = [u'b', u'g', u'r', u'c', u'm', u'y',]
+		cmaps = ["Blues",'Greens','Reds']
+
+		for i in range(self.k):
+			for j in range(self.mk[i]-1):
+				samples = self.parameter_history[self.effect_contrast_index(i,j)].values[burnin:,:]
+
+				mean = samples.mean(0)
+				std = samples.std(0)
+
+				plt.plot(self.x,mean,color=colors[j])
+				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
 
 	def plot_data(self,alpha=1,offset=1):
 		import matplotlib.pyplot as plt
