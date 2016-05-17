@@ -37,7 +37,6 @@ class GP_FANOVA(object):
 
 		ind = self.build_index()
 
-		# print self.sample_n*(1+sum(self.mk))+4+self.k*2, len(ind)
 		self.parameter_cache = pd.Series(np.zeros(len(ind)),
 											index=ind)
 
@@ -50,6 +49,18 @@ class GP_FANOVA(object):
 		self.parameter_cache['y_sigma'] = .1
 
 		self.parameter_history = pd.DataFrame(columns=ind)
+
+		ind = []
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				ind += self.effect_index(i,j)
+
+				# interactions
+				for k in range(i):
+					for l in range(self.mk[i]):
+						ind += self.effect_interaction_index(i,j,k,l)
+
+		self.effect_history = pd.DataFrame(columns=ind)
 
 		# contrasts
 		if contrast is None:
@@ -70,7 +81,7 @@ class GP_FANOVA(object):
 			# add interaction samples
 			for k in range(i):
 				for l in range(self.mk[i]-1):
-					for m in range(self.mk[k])-1:
+					for m in range(self.mk[k]-1):
 						ind += self.effect_interaction_contrast_index(i,l,k,m)
 				ind += ["(%s:%s)*_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
 						"(%s:%s)*_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i])]
@@ -81,7 +92,7 @@ class GP_FANOVA(object):
 
 	def effect_contrast_matrix_sum(self,i):
 		h = Sum().code_without_intercept(range(self.mk[i])).matrix
-		
+
 		return h
 
 	def effect_contrast_matrix_helmert(self,i):
@@ -178,6 +189,18 @@ class GP_FANOVA(object):
 
 		return mean,effects,effect_interactions,obs
 
+	def effect_index(self,k,l,):
+		"""lth sample of kth effect"""
+		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
+
+	def effect_interaction_index(self,k,l,m,n):
+		if k < m:
+			t1,t2 = k,l
+			k,l = m,n
+			m,n = t1,t2
+
+		return ['%s_%d:%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,GP_FANOVA.EFFECT_SUFFIXES[m],n,z) for z in self.x]
+
 	def effect_contrast_index(self,k,l,):
 		"""lth sample of kth effect"""
 		return ['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
@@ -225,26 +248,6 @@ class GP_FANOVA(object):
 
 			m+= resid
 		m /= tot
-
-		# tot = 0
-		# for k in range(self.mk[i]):
-		# 	if self.contrasts[i][k,j] == 0:
-		# 		continue
-		# 	tot+=1
-		#
-		# 	reps = np.where(self.effect[:,i]==k)[0]
-		# 	temp = []
-		# 	for r in reps:
-		#
-		# 		resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][self.effect[r,i],:])
-		# 		resid += contrasts[:,j] * self.contrasts[i][self.effect[r,i],j]
-		# 		temp.append(resid)
-		#
-		# 		obs += 1 # all timepoints observed, need to update for nan's
-		# 	temp = np.array(temp)/self.contrasts[i][k,j]
-		#
-		# 	m += temp.mean(0)
-		# m /= np.sum(self.contrasts[i][k,:] != 0)#tot # how many effects involved?
 
 		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
 
@@ -384,13 +387,13 @@ class GP_FANOVA(object):
 	def effect_samples(self,i,j):
 		samples = []
 
-		for h in range(self.parameter_history.shape[0]):
-			samples.append(np.dot(self.effect_contrast_array(i,h),self.contrasts[i][j,:]))
+		# compute samples not done already
+		for r in range(self.effect_history.shape[0],self.parameter_history.shape[0]):
+			self.effect_history.loc[r,self.effect_index(i,j)] = np.dot(self.effect_contrast_array(i,r),self.contrasts[i][j,:])
 
-		return np.array(samples)
+		return self.effect_history[self.effect_index(i,j)].values
 
-
-	def plot_functions(self,plot_mean=True,offset=True,burnin=0):
+	def plot_functions(self,plot_mean=True,offset=True,burnin=0,variance=False):
 		import matplotlib.pyplot as plt
 
 		# plt.gca().set_color_cycle(None)
@@ -406,15 +409,22 @@ class GP_FANOVA(object):
 				mean = samples.mean(0)
 				std = samples.std(0)
 
-				plt.plot(self.x,mean,color=colors[j])
-				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
+				if variance:
+					plt.plot(self.x,std,color=colors[j])
+				else:
+					plt.plot(self.x,mean,color=colors[j])
+					plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
 		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
 
 		if plot_mean:
 			mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
 			std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
-			plt.plot(self.x,mean,'k')
-			plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
+
+			if variance:
+				plt.plot(self.x,std,color='k')
+			else:
+				plt.plot(self.x,mean,'k')
+				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
 
 	def plot_contrasts(self,burnin=0):
 		import matplotlib.pyplot as plt
