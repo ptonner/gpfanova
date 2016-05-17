@@ -50,17 +50,13 @@ class GP_FANOVA(object):
 
 		self.parameter_history = pd.DataFrame(columns=ind)
 
-		ind = []
-		for i in range(self.k):
-			for j in range(self.mk[i]):
-				ind += self.effect_index(i,j)
+		ind = self.build_index(kernel_params=False)
+		ind += self.effect_indices()
+		self.derivative_history = pd.DataFrame(columns=ind)
 
-				# interactions
-				for k in range(i):
-					for l in range(self.mk[i]):
-						ind += self.effect_interaction_index(i,j,k,l)
 
-		self.effect_history = pd.DataFrame(columns=ind)
+		ind = self.effect_indices()
+		self.effect_history = pd.DataFrame(columns=ind,dtype=np.float64)
 
 		# contrasts
 		if contrast is None:
@@ -70,24 +66,40 @@ class GP_FANOVA(object):
 		else:
 			self.contrasts = [self.effect_contrast_matrix_sum(i) for i in range(self.k)]
 
-	def build_index(self):
+	def build_index(self,kernel_params=True):
 		# build the index for the parameter cache
 		ind = self.mu_index() + ['mu_sigma','mu_lengthscale']
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
 				ind += self.effect_contrast_index(i,j)
-			ind += ["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
+
+			if kernel_params:
+				ind += ["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
 
 			# add interaction samples
 			for k in range(i):
 				for l in range(self.mk[i]-1):
 					for m in range(self.mk[k]-1):
 						ind += self.effect_interaction_contrast_index(i,l,k,m)
-				ind += ["(%s:%s)*_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
+				if kernel_params:
+					ind += ["(%s:%s)*_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i]),
 						"(%s:%s)*_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[i])]
 
-		ind += ['y_sigma','y_lengthscale']
+		if kernel_params:
+			ind += ['y_sigma','y_lengthscale']
 
+		return ind
+
+	def effect_indices(self):
+		ind = []
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				ind += self.effect_index(i,j)
+
+				# interactions
+				for k in range(i):
+					for l in range(self.mk[i]):
+						ind += self.effect_interaction_index(i,j,k,l)
 		return ind
 
 	def effect_contrast_matrix_sum(self,i):
@@ -214,13 +226,21 @@ class GP_FANOVA(object):
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.x]
 
-	def effect_contrast_array(self,i,history=None):
+	def effect_contrast_array(self,i,history=None,deriv=False):
+
+		if deriv:
+			loc = self.derivative_history
+		elif not history is None:
+			loc = self.parameter_history
+		else:
+			loc = self.parameter_cache
+
 		a = np.zeros((self.n,self.mk[i]-1))
 		for j in range(self.mk[i]-1):
 			if history is None:
-				a[:,j] = self.parameter_cache[self.effect_contrast_index(i,j)]
+				a[:,j] = loc[self.effect_contrast_index(i,j)]
 			else:
-				a[:,j] = self.parameter_history.loc[history,self.effect_contrast_index(i,j)]
+				a[:,j] = loc.loc[history,self.effect_contrast_index(i,j)]
 		return a
 
 	def effect_contrast_conditional_params(self,i,j):
@@ -257,7 +277,7 @@ class GP_FANOVA(object):
 		A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
-	def mu_conditional_params(self):
+	def mu_conditional_params(self,history=None):
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
 
@@ -265,7 +285,7 @@ class GP_FANOVA(object):
 		for r in range(self.r):
 			obs += 1 # all timepoints observed, need to update for nan's
 			for i in range(self.k):
-				y_effect[:,r] = self.y[:,r] - np.dot(self.effect_contrast_array(i), self.contrasts[i][self.effect[r,i]])
+				y_effect[:,r] = self.y[:,r] - np.dot(self.effect_contrast_array(i,history), self.contrasts[i][self.effect[r,i]])
 
 				# need to do interaction here
 
@@ -290,14 +310,90 @@ class GP_FANOVA(object):
 		sigma,ls = self.parameter_cache[["%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j]),"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[j])]]
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
-	def alpha_k(self):
-		sigma,ls = self.parameter_cache[['alpha_sigma','alpha_lengthscale']]
-		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
-
 	def y_k(self):
 		sigma,ls = self.parameter_cache[['y_sigma','y_lengthscale']]
 		# return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 		return GPy.kern.White(self.p,variance=sigma)
+
+	@staticmethod
+	def covariance_derivative(k,x,ls,cross=False):
+
+		ls = ls**2
+
+		# difference between each observation pair
+		diff = np.zeros((x.shape[0],x.shape[0]))
+		for i in range(x.shape[0]):
+			for j in range(x.shape[0]):
+				diff[i,j] = x[i,:] - x[j,:]
+
+		if cross:
+			return -1./ls*diff*k
+
+		return 1./ls*(1-1./ls*(diff**2))*k
+
+	def temp(self):
+		ka = self.mu_k().K(self.x)
+		ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
+		ls = self.parameter_cache["mu_lengthscale"]
+		kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
+		kba = GP_FANOVA.covariance_derivative(ka,self.x,ls,cross=True)
+
+		return ka,kb,kba
+
+	def effect_derivative(self,i,j,s,mean=False):
+
+		# compute missing derivs
+		for r in range(self.derivative_history.shape[0],min(s,self.parameter_history.shape[0])):
+
+			# mu deriv
+			ka = self.mu_k().K(self.x)
+			ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
+			ls = self.parameter_history.loc[r,"mu_lengthscale"]
+			obs = self.parameter_history.loc[r,self.mu_index()]
+			kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
+			kba = GP_FANOVA.covariance_derivative(ka,self.x,ls,cross=True)
+
+			mu_mu,cov_mu = self.mu_conditional_params(r)
+			cov_mu_inv = np.linalg.inv(cov_mu+np.eye(self.n)*self.offset())
+
+			mu = np.dot(kba,np.dot(ka_inv,obs))
+			cov = kb + np.dot(kba,np.dot(ka_inv,kba.T))
+			# mu = np.dot(kba,np.dot(cov_mu_inv,obs-mu_mu))
+			# cov = kb - np.dot(kba,np.dot(cov_mu_inv,kba.T))
+
+			sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+			self.derivative_history.loc[r,self.mu_index()] = sample
+
+			# contrast derivs
+			for k in range(self.k):
+				# contrasts
+				ka = self.effect_contrast_k(k,).K(self.x)
+				ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
+
+				ls = self.parameter_history.loc[r,"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[k]]
+				for l in range(self.mk[k]-1):
+					obs = self.parameter_history.loc[r,self.effect_contrast_index(k,l)]
+					kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
+					kba = GP_FANOVA.covariance_derivative(ka,self.x,ls,cross=True)
+
+					mu = np.dot(kba,np.dot(ka_inv,obs))
+					cov = kb - np.dot(kba,np.dot(ka_inv,kba.T))
+
+					sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+					self.derivative_history.loc[r,self.effect_contrast_index(k,l)] = sample
+
+				# effects
+				a = self.effect_contrast_array(k,r,deriv=True)
+				for l in range(self.mk[k]):
+					self.derivative_history.loc[r,self.effect_index(k,l)] = np.dot(a,self.contrasts[k][l,:])
+
+
+		return self.derivative_history.loc[min(s,self.parameter_history.shape[0]),self.effect_index(i,j)]
+
+
+
 
 	def metroplis_hastings_sample(self,_min,_max,delta,parameter,likelihood):
 		j1 = scipy.stats.uniform(max(_min,self.parameter_cache[parameter]-delta), min(_max,self.parameter_cache[parameter]+delta))
@@ -389,7 +485,9 @@ class GP_FANOVA(object):
 
 		# compute samples not done already
 		for r in range(self.effect_history.shape[0],self.parameter_history.shape[0]):
-			self.effect_history.loc[r,self.effect_index(i,j)] = np.dot(self.effect_contrast_array(i,r),self.contrasts[i][j,:])
+			for k in range(self.k):
+				for l in range(self.mk[k]):
+					self.effect_history.loc[r,self.effect_index(k,l)] = np.dot(self.effect_contrast_array(k,r),self.contrasts[k][l,:])
 
 		return self.effect_history[self.effect_index(i,j)].values
 
