@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import GPy, scipy, time
+import GPy, scipy, time, utils
 from patsy.contrasts import Helmert, Sum
 
 class GP_FANOVA(object):
@@ -52,7 +52,7 @@ class GP_FANOVA(object):
 
 		ind = self.build_index(kernel_params=False)
 		ind += self.effect_indices()
-		self.derivative_history = pd.DataFrame(columns=ind)
+		self.derivative_history = pd.DataFrame(columns=ind,dtype=np.float64)
 
 
 		ind = self.effect_indices()
@@ -243,7 +243,40 @@ class GP_FANOVA(object):
 				a[:,j] = loc.loc[history,self.effect_contrast_index(i,j)]
 		return a
 
-	def effect_contrast_conditional_params(self,i,j):
+	def y_k_inv(self,x=None):
+		if x is None:
+			x = self.x
+
+		k_y = self.y_k().K(x)
+		chol_y = np.linalg.cholesky(k_y)
+		chol_y_inv = np.linalg.inv(chol_y)
+		y_inv = np.dot(chol_y_inv.T,chol_y_inv)
+
+		return y_inv
+
+	def mu_k_inv(self,x=None):
+		if x is None:
+			x = self.x
+
+		k_m = self.mu_k().K(x) + np.eye(x.shape[0])*self.offset()
+		chol_m = np.linalg.cholesky(k_m)
+		chol_m_inv = np.linalg.inv(chol_m)
+		m_inv = np.dot(chol_m_inv.T,chol_m_inv)
+
+		return m_inv
+
+	def contrast_k_inv(self,i,x=None):
+		if x is None:
+			x = self.x
+
+		k_c = self.effect_contrast_k(i).K(x) + np.eye(x.shape[0])*self.offset()
+		chol_c = np.linalg.cholesky(k_c)
+		chol_c_inv = np.linalg.inv(chol_c)
+		c_inv = np.dot(chol_c_inv.T,chol_c_inv)
+
+		return c_inv
+
+	def effect_contrast_conditional_params(self,i,j,cholesky=True,c_inv=None,y_inv=None):
 		"""compute the conditional mean and covariance of an effect contrast function"""
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
@@ -269,15 +302,39 @@ class GP_FANOVA(object):
 			m+= resid
 		m /= tot
 
-		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
+		if cholesky:
+			if c_inv is None:
+				# k_c = self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset()
+				# chol_c = np.linalg.cholesky(k_c)
+				# chol_c_inv = np.linalg.inv(chol_c)
+				# c_inv = np.dot(chol_c_inv.T,chol_c_inv)
+				c_inv = self.contrast_k_inv()
 
-		A = obs_cov_inv*obs + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
-		b = obs*np.dot(obs_cov_inv,m)
+			if y_inv is None:
+				# k_y = self.y_k().K(self.x)
+				# chol_y = np.linalg.cholesky(k_y)
+				# chol_y_inv = np.linalg.inv(chol_y)
+				# y_inv = np.dot(chol_y_inv.T,chol_y_inv)
+				y_inv = self.y_k_inv()
 
-		A_inv = np.linalg.inv(A)
+			A = obs*y_inv + c_inv
+			b = obs*np.dot(y_inv,m)
+
+			chol_A = np.linalg.cholesky(A)
+			chol_A_inv = np.linalg.inv(chol_A)
+			A_inv = np.dot(chol_A_inv.T,chol_A_inv)
+			# return scipy.linalg.cho_solve((chol_A,True),b),chol_A
+
+		else:
+			obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
+
+			A = obs_cov_inv*obs + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
+			b = obs*np.dot(obs_cov_inv,m)
+
+			A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
-	def mu_conditional_params(self,history=None):
+	def mu_conditional_params(self,history=None,cholesky=True,m_inv=None,y_inv=None):
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
 
@@ -290,12 +347,40 @@ class GP_FANOVA(object):
 				# need to do interaction here
 
 		m = np.mean(y_effect,1)
-		obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
 
-		A = obs*obs_cov_inv + np.linalg.inv(self.mu_k().K(self.x) + np.eye(self.n)*self.offset())
-		b = obs*np.dot(obs_cov_inv,m)
+		if cholesky:
+			# k_m = self.mu_k().K(self.x) + np.eye(self.n)*self.offset()
+			# k_y = self.y_k().K(self.x)
+			#
+			# chol_m = np.linalg.cholesky(k_m)
+			# chol_y = np.linalg.cholesky(k_y)
+			#
+			# chol_m_inv = np.linalg.inv(chol_m)
+			# m_inv = np.dot(chol_m_inv.T,chol_m_inv)
+			# chol_y_inv = np.linalg.inv(chol_y)
+			# y_inv = np.dot(chol_y_inv.T,chol_y_inv)
 
-		A_inv = np.linalg.inv(A)
+			if m_inv is None:
+				m_inv = self.mu_k_inv()
+			if y_inv is None:
+				y_inv = self.y_k_inv()
+
+			A = obs*y_inv + m_inv
+			b = obs*np.dot(y_inv,m)
+
+			chol_A = np.linalg.cholesky(A)
+			chol_A_inv = np.linalg.inv(chol_A)
+			A_inv = np.dot(chol_A_inv.T,chol_A_inv)
+
+			# return scipy.linalg.cho_solve((chol_A,True),b),chol_A
+
+		else:
+			obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
+
+			A = obs*obs_cov_inv + np.linalg.inv(self.mu_k().K(self.x) + np.eye(self.n)*self.offset())
+			b = obs*np.dot(obs_cov_inv,m)
+
+			A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
 	def mu_k(self):
@@ -340,10 +425,17 @@ class GP_FANOVA(object):
 
 		return ka,kb,kba
 
-	def effect_derivative(self,i,j,s,mean=False):
+	def effect_derivative(self,i,j,s=None,mean=False):
+
+		ind = None
+		if s is None:
+			ind = range(self.parameter_history.shape[0])
+			s = self.parameter_history.shape[0]-1
+		else:
+			s = min(s,self.parameter_history.shape[0]-1)
 
 		# compute missing derivs
-		for r in range(self.derivative_history.shape[0],min(s,self.parameter_history.shape[0])):
+		for r in range(self.derivative_history.shape[0],s+1):
 
 			# mu deriv
 			ka = self.mu_k().K(self.x)
@@ -353,11 +445,8 @@ class GP_FANOVA(object):
 			kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
 			kba = GP_FANOVA.covariance_derivative(ka,self.x,ls,cross=True)
 
-			mu_mu,cov_mu = self.mu_conditional_params(r)
-			cov_mu_inv = np.linalg.inv(cov_mu+np.eye(self.n)*self.offset())
-
 			mu = np.dot(kba,np.dot(ka_inv,obs))
-			cov = kb + np.dot(kba,np.dot(ka_inv,kba.T))
+			cov = kb - np.dot(kba,np.dot(ka_inv,kba.T))
 			# mu = np.dot(kba,np.dot(cov_mu_inv,obs-mu_mu))
 			# cov = kb - np.dot(kba,np.dot(cov_mu_inv,kba.T))
 
@@ -389,11 +478,16 @@ class GP_FANOVA(object):
 				for l in range(self.mk[k]):
 					self.derivative_history.loc[r,self.effect_index(k,l)] = np.dot(a,self.contrasts[k][l,:])
 
+		if ind is None:
+			sample = self.derivative_history.loc[s,self.effect_index(i,j)].values
+			if mean:
+				sample += self.derivative_history.loc[s,self.mu_index()]
+		else:
+			sample = self.derivative_history.loc[ind,self.effect_index(i,j)].values
+			if mean:
+				sample += self.derivative_history.loc[ind,self.mu_index()]
 
-		return self.derivative_history.loc[min(s,self.parameter_history.shape[0]),self.effect_index(i,j)]
-
-
-
+		return sample
 
 	def metroplis_hastings_sample(self,_min,_max,delta,parameter,likelihood):
 		j1 = scipy.stats.uniform(max(_min,self.parameter_cache[parameter]-delta), min(_max,self.parameter_cache[parameter]+delta))
@@ -411,20 +505,28 @@ class GP_FANOVA(object):
 		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
 			self.parameter_cache[parameter] = old_param
 
-	def gibbs_sample(self,param_fxn,parameters):
-		mu,cov = param_fxn()
+	def gibbs_sample(self,param_fxn,parameters,*args,**kwargs):
+		mu,cov = param_fxn(*args,**kwargs)
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+		# mu,cho = param_fxn(*args,**kwargs)
+		# sample = utils.mvn_sample(mu,cho)
 		self.parameter_cache[parameters] = sample
 
-	def update(self):
+	def update(self,cholesky=True):
+
+		y_inv = self.y_k_inv()
 
 		# update mu
-		self.gibbs_sample(self.mu_conditional_params,self.mu_index())
+		m_inv = self.mu_k_inv()
+		self.gibbs_sample(self.mu_conditional_params,self.mu_index(),cholesky=cholesky,m_inv=m_inv,y_inv=y_inv)
 
 		for i in range(self.k):
+			# invert the contrast matrix
+			c_inv = self.contrast_k_inv(i)
 			for j in range(self.mk[i]-1):
-				self.gibbs_sample(lambda: self.effect_contrast_conditional_params(i,j),
-									self.effect_contrast_index(i,j))
+				self.gibbs_sample(self.effect_contrast_conditional_params,
+									self.effect_contrast_index(i,j),i,j,cholesky=cholesky,c_inv=c_inv,y_inv=y_inv)
 
 		return
 
@@ -458,13 +560,13 @@ class GP_FANOVA(object):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
 
-	def sample(self,n=1,save=0,verbose=False):
+	def sample(self,n=1,save=0,verbose=False,cholesky=True):
 		start = self.parameter_history.shape[0]
 		i = 1
 
 		start_time = iter_time = time.time()
 		while self.parameter_history.shape[0] - start < n:
-			self.update()
+			self.update(cholesky=cholesky)
 
 			if save == 0 or i % save == 0:
 				self.store()
