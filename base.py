@@ -41,11 +41,11 @@ class GP_FANOVA(object):
 											index=ind)
 
 		# set some initial values
-		self.parameter_cache[['mu_sigma','mu_lengthscale','y_sigma','y_lengthscale']] = 1
-		for i in range(self.k):
-			self.parameter_cache[['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
-			for j in range(i):
-				self.parameter_cache[['(%s:%s)*_sigma'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i]),'(%s:%s)*_lengthscale'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i])]] = 1
+		# self.parameter_cache[['mu_sigma','mu_lengthscale','y_sigma','y_lengthscale']] = 1
+		# for i in range(self.k):
+		# 	self.parameter_cache[['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]]] = 1
+		# 	for j in range(i):
+		# 		self.parameter_cache[['(%s:%s)*_sigma'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i]),'(%s:%s)*_lengthscale'%(GP_FANOVA.EFFECT_SUFFIXES[j],GP_FANOVA.EFFECT_SUFFIXES[i])]] = 1
 		self.parameter_cache['y_sigma'] = .1
 
 		self.parameter_history = pd.DataFrame(columns=ind)
@@ -383,12 +383,50 @@ class GP_FANOVA(object):
 			A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
 
-	def mu_k(self):
-		sigma,ls = self.parameter_cache[['mu_sigma','mu_lengthscale']]
+	def mu_likelihood(self,sigma=None,ls=None):
+		mu = np.zeros(self.n)
+		cov = self.mu_k(sigma=sigma,ls=ls).K(self.x)
+		cov += cov.mean()*np.eye(self.n)*1e-6
+		return scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.mu_index()],mu,cov)
+
+	def effect_contrast_likelihood(self,i,sigma=None,ls=None):
+		ll = 1
+		for j in range(self.mk[i]-1):
+			mu = np.zeros(self.n)
+			cov = self.effect_contrast_k(i,sigma=sigma,ls=ls).K(self.x) + np.eye(self.n)*1e-6
+
+			try:
+				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
+			except np.linalg.LinAlgError:
+				print i,j
+
+		return ll
+
+	def mu_k(self,sigma=None,ls=None,history=None):
+		if sigma is None:
+			sigma = self.parameter_cache['mu_sigma']
+		if ls is None:
+			ls = self.parameter_cache['mu_lengthscale']
+		if not history is None:
+			sigma,ls = self.parameter_history.loc[history,'mu_sigma'],self.parameter_history.loc[history,'mu_lengthscale']
+
+		sigma = np.power(10,sigma)
+		ls = np.power(10,ls)
+
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
-	def effect_contrast_k(self,i):
-		sigma,ls = self.parameter_cache[["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
+	def effect_contrast_k(self,i,sigma=None,ls=None,history=None):
+		# sigma,ls = self.parameter_cache[["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
+		if sigma is None:
+			sigma = self.parameter_cache["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i]]
+		if ls is None:
+			ls = self.parameter_cache["%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
+		if not history is None:
+			sigma,ls = self.parameter_history.loc[history,"%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i]],self.parameter_history.loc[history,"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
+
+		sigma = np.power(10,sigma)
+		ls = np.power(10,ls)
+
 		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def effect_interaction_k(self,i,j):
@@ -438,7 +476,7 @@ class GP_FANOVA(object):
 		for r in range(self.derivative_history.shape[0],s+1):
 
 			# mu deriv
-			ka = self.mu_k().K(self.x)
+			ka = self.mu_k(history=r).K(self.x)
 			ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
 			ls = self.parameter_history.loc[r,"mu_lengthscale"]
 			obs = self.parameter_history.loc[r,self.mu_index()]
@@ -505,6 +543,42 @@ class GP_FANOVA(object):
 		if r < 1 and scipy.stats.uniform.rvs(0,1)>max(0,r): # put old back in
 			self.parameter_cache[parameter] = old_param
 
+	def slice_sample_stepout(self,logdensity_fxn,x,w,m):
+		f0 = logdensity_fxn(x)
+		z = f0 - scipy.stats.expon.rvs(1)
+
+		# find our interval
+		u = scipy.stats.uniform.rvs(0,1)
+		l = x-w*u
+		r = l+w
+
+		v = scipy.stats.uniform.rvs(0,1)
+		j = int(m*v)
+		k = m-1-j
+
+		while j > 0 and z < logdensity_fxn(l):
+			j -= 1
+			l -= w
+
+		while k > 0 and z < logdensity_fxn(r):
+			k -= 1
+			r += w
+
+		# pick a new point
+		u = scipy.stats.uniform.rvs(0,1)
+		x1 = l + u*(r-l)
+
+		while z > logdensity_fxn(x1):
+			if x1 < x:
+				l = x1
+			else:
+				r = x1
+
+			u = scipy.stats.uniform.rvs(0,1)
+			x1 = l + u*(r-l)
+
+		return x1
+
 	def gibbs_sample(self,param_fxn,parameters,*args,**kwargs):
 		mu,cov = param_fxn(*args,**kwargs)
 		sample = scipy.stats.multivariate_normal.rvs(mu,cov)
@@ -527,6 +601,13 @@ class GP_FANOVA(object):
 			for j in range(self.mk[i]-1):
 				self.gibbs_sample(self.effect_contrast_conditional_params,
 									self.effect_contrast_index(i,j),i,j,cholesky=cholesky,c_inv=c_inv,y_inv=y_inv)
+
+		self.parameter_cache['mu_sigma'] = self.slice_sample_stepout(lambda x: self.mu_likelihood(sigma=x),self.parameter_cache['mu_sigma'],.1,10)
+		self.parameter_cache['mu_lengthscale'] = self.slice_sample_stepout(lambda x: self.mu_likelihood(ls=x),self.parameter_cache['mu_lengthscale'],.1,10)
+
+		for i in range(self.k):
+			self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]] = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,sigma=x),self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
+			self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]] = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,ls=x),self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
 
 		return
 
