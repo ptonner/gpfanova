@@ -124,3 +124,25 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=None,**kwargs):
 
 		plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
 		plt.ylim(m.y.min(),m.y.max())
+
+def plot_hyper_params(m,logspace=True):
+
+	def plot_param(param):
+		if logspace:
+			plt.plot(m.parameter_history[param])
+		else:
+			plt.plot(10**m.parameter_history[param])
+		plt.title(param,fontsize=20)
+
+	nrows = 1 + m.k
+
+	plt.subplot(nrows,2,1)
+	plot_param('mu_sigma')
+	plt.subplot(nrows,2,2)
+	plot_param('mu_lengthscale')
+
+	for i in range(m.k):
+		plt.subplot(nrows,2,2+2*i+1)
+		plot_param('%s*_sigma'%m.EFFECT_SUFFIXES[i])
+		plt.subplot(nrows,2,2+2*i+2)
+		plot_param('%s*_lengthscale'%m.EFFECT_SUFFIXES[i])
