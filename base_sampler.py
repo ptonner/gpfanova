@@ -44,11 +44,18 @@ class GP_FANOVA(sampler.SamplerContainer):
 			for j in range(self.mk[i]-1):
 				samplers.append(sampler.Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
 										self.effect_contrast_index(i,j),
-										lambda : self.effect_contrast_conditional_params(i,j)))
-
+										lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
 			samplers += [sampler.Fixed('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],)]
 			samplers += [sampler.Fixed('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],)]
 		# samplers += [Slice('mu_sigma','mu_sigma',)]
+
+		# add effect transforms
+		for k in range(self.k):
+			for l in range(self.mk[i]):
+				samplers.append(sampler.Transform('%s_%d'%(GP_FANOVA.EFFECT_SUFFIXES[k],l),
+										self.effect_index(k,l),
+										lambda k=k,l=l : self.effect_sample(k,l)))
+
 		sampler.SamplerContainer.__init__(self,*samplers)
 
 		# contrasts
@@ -57,6 +64,10 @@ class GP_FANOVA(sampler.SamplerContainer):
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
 		return 1e-9
+
+	def effect_index(self,k,l,):
+		"""lth sample of kth effect"""
+		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
 
 	def effect_contrast_index(self,k,l,):
 		"""lth sample of kth effect"""
@@ -200,6 +211,7 @@ class GP_FANOVA(sampler.SamplerContainer):
 		contrasts = self.effect_contrast_array(i)
 
 		tot = 0
+		# calculate residual for each replicate, r
 		for r in range(self.r):
 			e = self.effect[r,i]
 			if self.contrasts[i][e,j] == 0: # don't use this observation
@@ -240,3 +252,7 @@ class GP_FANOVA(sampler.SamplerContainer):
 
 			A_inv = np.linalg.inv(A)
 		return np.dot(A_inv,b), A_inv
+
+	def effect_sample(self,i,j):
+
+		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])

@@ -80,7 +80,8 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 			r = .4
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
 
-		samples = m.effect_samples(k,j)[burnin:,:]
+		# samples = m.effect_samples(k,j)[burnin:,:]
+		samples = m.parameter_history[m.effect_index(k,j)].values[burnin:,:]
 		if offset:
 			samples += m.parameter_history[m.mu_index()].values[burnin:,:]
 

@@ -1,6 +1,6 @@
 import random as pyrandom
 import pandas as pd
-import scipy
+import scipy, time
 
 class Sampler(object):
 
@@ -45,20 +45,7 @@ class SamplerContainer(object):
 
 		return ind
 
-	# def _sample(self,random=True):
-	#
-	# 	ind = len(self.samplers)
-	#
-	# 	if random:
-	# 		pyrandom.shuffle(ind)
-	#
-	# 	for i in ind:
-	# 		sampler = self.samplers[i]
-	#
-	# 		sample = sampler.sample(*args)
-	# 		self.parameter_cache[sampler.parameters] = sample
-
-	def sample(self,random=False):
+	def _sample(self,random=False):
 
 		ind = range(len(self.samplers))
 
@@ -72,11 +59,34 @@ class SamplerContainer(object):
 			if sampler.current_param_dependent:
 				args += [self.parameter_cache[sampler.parameters]]
 
-			print sampler
-
 			sample = sampler.sample(*args)
 			self.parameter_cache[sampler.parameters] = sample
 
+	def sample(self,n=1,save=0,verbose=False):
+		start = self.parameter_history.shape[0]
+		i = 1
+
+		start_time = iter_time = time.time()
+		while self.parameter_history.shape[0] - start < n:
+			self._sample()
+
+			if save == 0 or i % save == 0:
+				self.store()
+
+				if verbose:
+					j = self.parameter_history.shape[0] - start
+
+					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60)
+					iter_time = time.time()
+
+			i+=1
+
+		if verbose:
+			print "%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60)
+
+	def store(self):
+		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
+		self.parameter_history.index = range(self.parameter_history.shape[0])
 
 	def __repr__(self):
 		s = "\n".join(['SamplerContainer:']+[str(samp) for samp in self.samplers])
@@ -92,6 +102,16 @@ class Fixed(Sampler):
 
 	def _sample(self,x,*args,**kwargs):
 		return x
+
+class Transform(Sampler):
+	"""not a true 'sampler', but some variable that is a transform of other variables"""
+
+	def __init__(self,name,parameters,transform_fxn):
+		Sampler.__init__(self,name,'Transform',parameters,)
+		self.transform_fxn = transform_fxn
+
+	def _sample(self,*args,**kwargs):
+		return self.transform_fxn()
 
 
 class Gibbs(Sampler):
