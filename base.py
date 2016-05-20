@@ -479,6 +479,7 @@ class GP_FANOVA(object):
 			ka = self.mu_k(history=r).K(self.x)
 			ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
 			ls = self.parameter_history.loc[r,"mu_lengthscale"]
+			ls = np.power(10,ls)
 			obs = self.parameter_history.loc[r,self.mu_index()]
 			kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
 			kba = GP_FANOVA.covariance_derivative(ka,self.x,ls,cross=True)
@@ -495,10 +496,11 @@ class GP_FANOVA(object):
 			# contrast derivs
 			for k in range(self.k):
 				# contrasts
-				ka = self.effect_contrast_k(k,).K(self.x)
+				ka = self.effect_contrast_k(k,history=r).K(self.x)
 				ka_inv = np.linalg.inv(ka+np.eye(self.n)*self.offset())
 
 				ls = self.parameter_history.loc[r,"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[k]]
+				ls = np.power(10,ls)
 				for l in range(self.mk[k]-1):
 					obs = self.parameter_history.loc[r,self.effect_contrast_index(k,l)]
 					kb = GP_FANOVA.covariance_derivative(ka,self.x,ls)
@@ -544,6 +546,20 @@ class GP_FANOVA(object):
 			self.parameter_cache[parameter] = old_param
 
 	def slice_sample_stepout(self,logdensity_fxn,x,w,m):
+		"""Slice sampling as described in Neal (2003), using the 'step-out' algorithm.
+
+		Args:
+			logdensity_fxn: conditional density function of the parameter X that we will evaluate to find our slice interval
+			x: our current state of the variable X
+			w: an interval step size, defining how large each interval increase is
+			m: limits the maximum interval size to w*m
+
+		Returns:
+			x1: the new sample of the variable X
+			l,r: the final region bounds used
+
+
+		"""
 		f0 = logdensity_fxn(x)
 		z = f0 - scipy.stats.expon.rvs(1)
 
@@ -577,7 +593,7 @@ class GP_FANOVA(object):
 			u = scipy.stats.uniform.rvs(0,1)
 			x1 = l + u*(r-l)
 
-		return x1
+		return x1, (l,r)
 
 	def gibbs_sample(self,param_fxn,parameters,*args,**kwargs):
 		mu,cov = param_fxn(*args,**kwargs)
@@ -602,12 +618,12 @@ class GP_FANOVA(object):
 				self.gibbs_sample(self.effect_contrast_conditional_params,
 									self.effect_contrast_index(i,j),i,j,cholesky=cholesky,c_inv=c_inv,y_inv=y_inv)
 
-		self.parameter_cache['mu_sigma'] = self.slice_sample_stepout(lambda x: self.mu_likelihood(sigma=x),self.parameter_cache['mu_sigma'],.1,10)
-		self.parameter_cache['mu_lengthscale'] = self.slice_sample_stepout(lambda x: self.mu_likelihood(ls=x),self.parameter_cache['mu_lengthscale'],.1,10)
+		self.parameter_cache['mu_sigma'],_ = self.slice_sample_stepout(lambda x: self.mu_likelihood(sigma=x),self.parameter_cache['mu_sigma'],.1,10)
+		self.parameter_cache['mu_lengthscale'],_ = self.slice_sample_stepout(lambda x: self.mu_likelihood(ls=x),self.parameter_cache['mu_lengthscale'],.1,10)
 
 		for i in range(self.k):
-			self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]] = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,sigma=x),self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
-			self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]] = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,ls=x),self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
+			self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]],_ = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,sigma=x),self.parameter_cache['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
+			self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],_ = self.slice_sample_stepout(lambda x: self.effect_contrast_likelihood(i,ls=x),self.parameter_cache['%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],.1,10)
 
 		return
 
@@ -673,72 +689,3 @@ class GP_FANOVA(object):
 					self.effect_history.loc[r,self.effect_index(k,l)] = np.dot(self.effect_contrast_array(k,r),self.contrasts[k][l,:])
 
 		return self.effect_history[self.effect_index(i,j)].values
-
-	def plot_functions(self,plot_mean=True,offset=True,burnin=0,variance=False):
-		import matplotlib.pyplot as plt
-
-		# plt.gca().set_color_cycle(None)
-		colors = [u'b', u'g', u'r', u'c', u'm', u'y',]
-		cmaps = ["Blues",'Greens','Reds']
-
-		for i in range(self.k):
-			for j in range(self.mk[i]):
-				samples = self.effect_samples(i,j)[burnin:,:]
-				if offset:
-					samples += self.parameter_history[self.mu_index()].values[burnin:,:]
-
-				mean = samples.mean(0)
-				std = samples.std(0)
-
-				if variance:
-					plt.plot(self.x,std,color=colors[j])
-				else:
-					plt.plot(self.x,mean,color=colors[j])
-					plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
-		# [plt.plot(self.sample_x,(self.parameter_history[self.mu_index()].values + self.parameter_history[self.alpha_index(i)].values).mean(0)) for i in range(self.k)]
-
-		if plot_mean:
-			mean = self.parameter_history[self.mu_index()].values[burnin:,:].mean(0)
-			std = self.parameter_history[self.mu_index()].values[burnin:,:].std(0)
-
-			if variance:
-				plt.plot(self.x,std,color='k')
-			else:
-				plt.plot(self.x,mean,'k')
-				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
-
-	def plot_contrasts(self,burnin=0):
-		import matplotlib.pyplot as plt
-
-		# plt.gca().set_color_cycle(None)
-		colors = [u'b', u'g', u'r', u'c', u'm', u'y',]
-		cmaps = ["Blues",'Greens','Reds']
-
-		for i in range(self.k):
-			for j in range(self.mk[i]-1):
-				samples = self.parameter_history[self.effect_contrast_index(i,j)].values[burnin:,:]
-
-				mean = samples.mean(0)
-				std = samples.std(0)
-
-				plt.plot(self.x,mean,color=colors[j])
-				plt.fill_between(self.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=colors[j])
-
-	def plot_data(self,alpha=1,offset=1):
-		import matplotlib.pyplot as plt
-
-		colors = [u'b', u'g', u'r', u'c', u'm', u'y']
-		cmaps = [plt.get_cmap(c) for c in ["Blues",'Greens','Reds']]
-
-		# first effect is color,
-		# second effect is subplot
-
-		for i in range(self.y.shape[1]):
-			if self.k >= 2:
-				plt.subplot(1,self.mk[1],self.effect[i,1]+1)
-				# c = cmaps[self.effect[i,0]](1.*(self.effect[i,1] + offset)/(self.mk[1]+2*offset))
-			# else:
-			c = colors[self.effect[i,0]]
-
-			plt.plot(self.x,self.y[:,i],color=c,alpha=alpha)
-			plt.ylim(self.y.min(),self.y.max())
