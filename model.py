@@ -205,6 +205,19 @@ class GP_FANOVA(object):
 
 		return ll
 
+	def interaction_likelihood(self,i,k):
+		ll = 1
+		for j in range(self.mk[i]):
+			for l in range(self.mk[k]):
+				mu,cov = self.interaction_parameters(i,j,k,l)
+
+				try:
+					ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_interaction_index(i,j,k,l)],mu,cov)
+				except np.linalg.LinAlgError:
+					print i,j
+
+		return ll
+
 	def y_sub_alpha(self):
 		ysa = self.y - np.column_stack([self.parameter_cache[self.alpha_index(i)] for i in self.effect])
 		return np.sum(ysa,1)/self.nt
@@ -293,6 +306,28 @@ class GP_FANOVA(object):
 		# 	return mu,np.zeros((self.sample_n,self.sample_n))
 
 		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j) * self.effect_k(i).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
+
+		return mu,cov
+
+	def interaction_parameters(self,i,j,k,l):
+		sub_effect_1,sub_effect_2 = np.zeros(self.sample_n), np.zeros(self.sample_n)
+
+		for m in range(j):
+			sub_effect_1 -= self.parameter_cache[self.effect_interaction_index(i,m,k,l)]
+		for n in range(l):
+			sub_effect_2 -= self.parameter_cache[self.effect_interaction_index(i,j,k,n)]
+
+		# print sub_effect_1, sub_effect_2
+
+		# if j == self.mk[i] - 1:
+		# 	return sub_effect_1,np.zeros((self.sample_n,self.sample_n))
+		# elif l == self.mk[k] - 1:
+		# 	return sub_effect_2,np.zeros((self.sample_n,self.sample_n))
+		# else:
+		mu = - sub_effect_1 - sub_effect_2
+
+		mu = mu/(self.mk[i]-j)/(self.mk[k]-l)
+		cov = 1.*(self.mk[i]-j-1)/(self.mk[i]-j)*(self.mk[k]-l-1)/(self.mk[k]-l) * self.effect_interaction_k(i,k).K(self.sample_x) + np.eye(self.sample_n)*self.offset()
 
 		return mu,cov
 
@@ -470,6 +505,10 @@ class GP_FANOVA(object):
 			self.metroplis_hastings_sample(1e-6,100,10,"%s_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],lambda: self.effect_likelihood(i))
 
 		# interactions
+		for i in range(self.k):
+			for k in range(i+1,self.k):
+				self.metroplis_hastings_sample(1e-6,100,10,"%s:%s_lengthscale"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[k]),lambda: self.interaction_likelihood(i,k))
+				self.metroplis_hastings_sample(1e-6,100,10,"%s:%s_sigma"%(GP_FANOVA.EFFECT_SUFFIXES[i],GP_FANOVA.EFFECT_SUFFIXES[k]),lambda: self.interaction_likelihood(i,k))
 
 		# store the likelihood
 		self.parameter_cache['log_likelihood'] = self.likelihood()
