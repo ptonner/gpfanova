@@ -1,6 +1,6 @@
 from patsy.contrasts import Sum
 # from sampler import SamplerContainer, Gibbs, Slice
-import sampler; reload(sampler)
+import sample;# reload(sample)
 import numpy as np
 import GPy, scipy
 
@@ -279,6 +279,6 @@ class GP_FANOVA(sampler.SamplerContainer):
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
 			except np.linalg.LinAlgError:
-				print "likelihood LinAlgError (%d,%d)" % i,j
+				print "likelihood LinAlgError (%d,%d)" % (i,j)
 
 		return ll
