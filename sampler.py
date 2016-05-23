@@ -57,7 +57,13 @@ class SamplerContainer(object):
 
 			args = []
 			if sampler.current_param_dependent:
-				args += [self.parameter_cache[sampler.parameters]]
+				param = self.parameter_cache[sampler.parameters]
+
+				# just use the parameter value if length one
+				if len(sampler.parameters) == 1:
+					param = param[0]
+
+				args += [param]
 
 			sample = sampler.sample(*args)
 			self.parameter_cache[sampler.parameters] = sample
@@ -129,7 +135,7 @@ class Gibbs(Sampler):
 class Slice(Sampler):
 	"""Slice sampling as described in Neal (2003), using the 'step-out' algorithm."""
 
-	def _init__(self,name,parameters,logdensity_fxn,w,m):
+	def __init__(self,name,parameters,logdensity_fxn,w,m):
 		"""Args:
 			logdensity_fxn: logarithm of conditional density function of the parameter X that we will evaluate to find our slice interval
 			w: an interval step size, defining how large each interval increase is
@@ -139,7 +145,7 @@ class Slice(Sampler):
 			x1: the new sample of the variable X
 			l,r: the final region bounds used
 		"""
-		Sampler.__init__(self,name,'Slice',parameters)
+		Sampler.__init__(self,name,'Slice',parameters,current_param_dependent=True)
 		self.logdensity_fxn = logdensity_fxn
 		self.w = w
 		self.m = m
