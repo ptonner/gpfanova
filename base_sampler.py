@@ -38,15 +38,15 @@ class GP_FANOVA(sampler.SamplerContainer):
 		# SamplerContainer
 		samplers = [sampler.Fixed('y_sigma','y_sigma',)]
 		samplers += [sampler.Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
-		samplers += [sampler.Fixed('mu_sigma','mu_sigma',)]
-		samplers += [sampler.Fixed('mu_lengthscale','mu_lengthscale',)]
+		samplers += [sampler.Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
+		samplers += [sampler.Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
 				samplers.append(sampler.Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
 										self.effect_contrast_index(i,j),
 										lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
-			samplers += [sampler.Fixed('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],)]
-			samplers += [sampler.Fixed('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],)]
+			samplers += [sampler.Slice('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,sigma=x),.1,10)]
+			samplers += [sampler.Slice('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,lengthscale=x),.1,10)]
 		# samplers += [Slice('mu_sigma','mu_sigma',)]
 
 		# add effect transforms
@@ -256,3 +256,22 @@ class GP_FANOVA(sampler.SamplerContainer):
 	def effect_sample(self,i,j):
 
 		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
+
+	def mu_likelihood(self,sigma=None,ls=None):
+		mu = np.zeros(self.n)
+		cov = self.mu_k(sigma=sigma,ls=ls).K(self.x)
+		cov += cov.mean()*np.eye(self.n)*1e-6
+		return scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.mu_index()],mu,cov)
+
+	def effect_contrast_likelihood(self,i,sigma=None,lengthscale=None):
+		ll = 1
+		for j in range(self.mk[i]-1):
+			mu = np.zeros(self.n)
+			cov = self.effect_contrast_k(i,sigma=sigma,ls=lengthscale).K(self.x) + np.eye(self.n)*1e-6
+
+			try:
+				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
+			except np.linalg.LinAlgError:
+				print i,j
+
+		return ll
