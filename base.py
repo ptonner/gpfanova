@@ -180,6 +180,13 @@ class GP_FANOVA(sampler.SamplerContainer):
 
 		m = np.mean(y_effect,1)
 
+		# attempt at GP regression like params
+		# y_inv = self.y_k_inv()
+		# mu_k = self.mu_k().K(self.x)
+		# m = np.dot(np.dot(mu_k,y_inv),m)
+		# cov = mu_k - np.dot(mu_k,np.dot(y_inv,mu_k.T))
+		# return m,cov
+
 		if cholesky:
 
 			if m_inv is None:
@@ -272,6 +279,6 @@ class GP_FANOVA(sampler.SamplerContainer):
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
 			except np.linalg.LinAlgError:
-				print i,j
+				print "likelihood LinAlgError (%d,%d)" % i,j
 
 		return ll
