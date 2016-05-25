@@ -1,4 +1,5 @@
 from . import Sampler
+import scipy
 
 class Gibbs(Sampler):
 

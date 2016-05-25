@@ -1,5 +1,5 @@
 from patsy.contrasts import Sum
-from sampler import SamplerContainer, Gibbs, Slice, Fixed, Transform
+from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform
 import numpy as np
 import GPy, scipy
 

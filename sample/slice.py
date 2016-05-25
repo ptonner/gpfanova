@@ -1,4 +1,5 @@
 from . import Sampler
+import scipy
 
 class Slice(Sampler):
 	"""Slice sampling as described in Neal (2003), using the 'step-out' algorithm."""
