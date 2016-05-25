@@ -1,10 +1,9 @@
 from patsy.contrasts import Sum
-# from sampler import SamplerContainer, Gibbs, Slice
-import sample;# reload(sample)
+from sampler import SamplerContainer, Gibbs, Slice
 import numpy as np
 import GPy, scipy
 
-class GP_FANOVA(sampler.SamplerContainer):
+class GP_FANOVA(SamplerContainer):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
@@ -36,27 +35,27 @@ class GP_FANOVA(sampler.SamplerContainer):
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
 		# SamplerContainer
-		samplers = [sampler.Fixed('y_sigma','y_sigma',)]
-		samplers += [sampler.Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
-		samplers += [sampler.Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
-		samplers += [sampler.Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
+		samplers = [Fixed('y_sigma','y_sigma',)]
+		samplers += [Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
+		samplers += [Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
+		samplers += [Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
-				samplers.append(sampler.Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
+				samplers.append(Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
 										self.effect_contrast_index(i,j),
 										lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
-			samplers += [sampler.Slice('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,sigma=x),.1,10)]
-			samplers += [sampler.Slice('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,lengthscale=x),.1,10)]
+			samplers += [Slice('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,sigma=x),.1,10)]
+			samplers += [Slice('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,lengthscale=x),.1,10)]
 		# samplers += [Slice('mu_sigma','mu_sigma',)]
 
 		# add effect transforms
 		for k in range(self.k):
 			for l in range(self.mk[i]):
-				samplers.append(sampler.Transform('%s_%d'%(GP_FANOVA.EFFECT_SUFFIXES[k],l),
+				samplers.append(Transform('%s_%d'%(GP_FANOVA.EFFECT_SUFFIXES[k],l),
 										self.effect_index(k,l),
 										lambda k=k,l=l : self.effect_sample(k,l)))
 
-		sampler.SamplerContainer.__init__(self,*samplers)
+		SamplerContainer.__init__(self,*samplers)
 
 		# contrasts
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
