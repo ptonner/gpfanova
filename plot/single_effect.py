@@ -24,8 +24,8 @@ def _plot_single_effect_derivative(m,k,subplots=None,_mean=False,offset=False,va
 
 	for j in range(m.mk[k]):
 
-		if m.mk[k] <= len(_colors):
-			c = _colors[j]
+		if m.mk[k] <= len(colors):
+			c = colors[j]
 		else:
 			r = .4
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
@@ -71,8 +71,8 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 
 	for j in range(m.mk[k]):
 
-		if m.mk[k] <= len(_colors):
-			c = _colors[j]
+		if m.mk[k] <= len(colors):
+			c = colors[j]
 		else:
 			r = .4
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
@@ -118,7 +118,7 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=None,**kwargs):
 		if subplots:
 			plt.subplot(subplots[0],subplots[1],m.effect[i,k]+1)
 
-		c = _colors[m.effect[i,0]]
+		c = colors[m.effect[i,0]]
 
 		plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
 		plt.ylim(m.y.min(),m.y.max())
