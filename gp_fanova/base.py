@@ -80,14 +80,6 @@ class GP_FANOVA(SamplerContainer):
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.x]
 
-	# def y_k(self):
-	# 	sigma,ls = self.parameter_cache[['y_sigma','y_lengthscale']]
-	#
-	# 	sigma = np.power(10,sigma)
-	# 	ls = np.power(10,ls)
-	#
-	# 	return GPy.kern.White(self.p,variance=sigma)
-
 	def effect_contrast_k(self,i):
 
 		return self._effect_contrast_k[i]
@@ -102,13 +94,6 @@ class GP_FANOVA(SamplerContainer):
 			x = self.x
 
 		return self.y_k.K_inv(x)
-
-		k_y = self.y_k().K(x)
-		chol_y = np.linalg.cholesky(k_y)
-		chol_y_inv = np.linalg.inv(chol_y)
-		y_inv = np.dot(chol_y_inv.T,chol_y_inv)
-
-		return y_inv
 
 	def mu_k_inv(self,x=None):
 		if x is None:
