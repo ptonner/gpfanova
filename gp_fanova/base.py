@@ -1,6 +1,6 @@
 from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform
-from kernel import RBF
+from kernel import RBF, White
 import numpy as np
 import GPy, scipy
 
@@ -61,6 +61,7 @@ class GP_FANOVA(SamplerContainer):
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
 
 		# kenels
+		self.y_k = White(self,['y_sigma'],logspace=True)
 		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
 		self._effect_contrast_k = [RBF(self,['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],logspace=True) for i in range(self.k)]
 
@@ -79,13 +80,13 @@ class GP_FANOVA(SamplerContainer):
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.x]
 
-	def y_k(self):
-		sigma,ls = self.parameter_cache[['y_sigma','y_lengthscale']]
-
-		sigma = np.power(10,sigma)
-		ls = np.power(10,ls)
-
-		return GPy.kern.White(self.p,variance=sigma)
+	# def y_k(self):
+	# 	sigma,ls = self.parameter_cache[['y_sigma','y_lengthscale']]
+	#
+	# 	sigma = np.power(10,sigma)
+	# 	ls = np.power(10,ls)
+	#
+	# 	return GPy.kern.White(self.p,variance=sigma)
 
 	def effect_contrast_k(self,i):
 
@@ -100,6 +101,8 @@ class GP_FANOVA(SamplerContainer):
 		if x is None:
 			x = self.x
 
+		return self.y_k.K_inv(x)
+
 		k_y = self.y_k().K(x)
 		chol_y = np.linalg.cholesky(k_y)
 		chol_y_inv = np.linalg.inv(chol_y)
@@ -113,24 +116,11 @@ class GP_FANOVA(SamplerContainer):
 
 		return self.mu_k.K_inv(x)
 
-		# k_m = self.mu_k().K(x) + np.eye(x.shape[0])*self.offset()
-		k_m = self.mu_k.K(x) + np.eye(x.shape[0])*self.offset()
-		chol_m = np.linalg.cholesky(k_m)
-		chol_m_inv = np.linalg.inv(chol_m)
-		m_inv = np.dot(chol_m_inv.T,chol_m_inv)
-
-		return m_inv
-
 	def contrast_k_inv(self,i,x=None):
 		if x is None:
 			x = self.x
 
-		k_c = self.effect_contrast_k(i).K(x) + np.eye(x.shape[0])*self.offset()
-		chol_c = np.linalg.cholesky(k_c)
-		chol_c_inv = np.linalg.inv(chol_c)
-		c_inv = np.dot(chol_c_inv.T,chol_c_inv)
-
-		return c_inv
+		return self._effect_contrast_k[i].K_inv(x)
 
 	def effect_contrast_array(self,i,history=None,deriv=False):
 
@@ -178,7 +168,7 @@ class GP_FANOVA(SamplerContainer):
 			A_inv = np.dot(chol_A_inv.T,chol_A_inv)
 
 		else:
-			obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
+			obs_cov_inv = np.linalg.inv(self.y_k.K(self.x))
 
 			A = obs*obs_cov_inv + np.linalg.inv(self.mu_k().K(self.x) + np.eye(self.n)*self.offset())
 			b = obs*np.dot(obs_cov_inv,m)
@@ -228,7 +218,7 @@ class GP_FANOVA(SamplerContainer):
 			A_inv = np.dot(chol_A_inv.T,chol_A_inv)
 
 		else:
-			obs_cov_inv = np.linalg.inv(self.y_k().K(self.x))
+			obs_cov_inv = np.linalg.inv(self.y_k.K(self.x))
 
 			A = obs_cov_inv*obs + np.linalg.inv(self.effect_contrast_k(i).K(self.x) + np.eye(self.n)*self.offset())
 			b = obs*np.dot(obs_cov_inv,m)

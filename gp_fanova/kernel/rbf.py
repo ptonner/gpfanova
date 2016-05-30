@@ -4,9 +4,6 @@ import numpy as np
 class RBF(Kernel):
 	"""Radical basis fuction"""
 
-	def __init__(self,*args,**kwargs):
-		Kernel.__init__(self,*args,**kwargs)
-
 	@staticmethod
 	def dist(X,lengthscale):
 		X = X/lengthscale
