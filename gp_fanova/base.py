@@ -36,7 +36,8 @@ class GP_FANOVA(SamplerContainer):
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
 		# SamplerContainer
-		samplers = [Fixed('y_sigma','y_sigma',)]
+		# samplers = [Fixed('y_sigma','y_sigma',)]
+		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,.1,10)]
 		samplers += [Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
 		samplers += [Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
 		samplers += [Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
@@ -214,6 +215,23 @@ class GP_FANOVA(SamplerContainer):
 	def effect_sample(self,i,j):
 
 		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
+
+	def y_mu(self):
+		mu = np.zeros(self.n*self.r)
+		for i in range(self.r):
+			mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.mu_index()]
+			for k in range(self.k):
+				for l in range(self.mk[k]-1):
+					mu[i*self.n:(i+1)*self.n] += self.effect_sample(k,l)
+
+		return mu
+
+	def y_likelihood(self,sigma=None):
+		y = np.ravel(self.y.T)
+		mu = self.y_mu()
+		sigma = 10**sigma
+
+		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
 	def mu_likelihood(self,sigma=None,ls=None):
 		mu = np.zeros(self.n)

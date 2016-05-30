@@ -14,6 +14,8 @@ class Kernel(object):
 
 		# set args as params
 		for i in range(len(args)):
+			if args[i] is None:
+				continue
 			params[i] = args[i]
 
 		# look for params in kwargs
