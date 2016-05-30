@@ -111,6 +111,8 @@ class GP_FANOVA(SamplerContainer):
 		if x is None:
 			x = self.x
 
+		return self.mu_k.K_inv(x)
+
 		# k_m = self.mu_k().K(x) + np.eye(x.shape[0])*self.offset()
 		k_m = self.mu_k.K(x) + np.eye(x.shape[0])*self.offset()
 		chol_m = np.linalg.cholesky(k_m)
@@ -160,13 +162,6 @@ class GP_FANOVA(SamplerContainer):
 				# need to do interaction here
 
 		m = np.mean(y_effect,1)
-
-		# attempt at GP regression like params
-		# y_inv = self.y_k_inv()
-		# mu_k = self.mu_k().K(self.x)
-		# m = np.dot(np.dot(mu_k,y_inv),m)
-		# cov = mu_k - np.dot(mu_k,np.dot(y_inv,mu_k.T))
-		# return m,cov
 
 		if cholesky:
 

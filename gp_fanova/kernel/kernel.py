@@ -1,3 +1,6 @@
+import numpy as np
+
+OFFSET = 1e-9
 
 class Kernel(object):
 
@@ -32,6 +35,15 @@ class Kernel(object):
 	def K(self,X,*args,**kwargs):
 		params = self.build_params(*args,**kwargs)
 		return self._K(X,*params)
+
+	def K_inv(self,X,*args,**kwargs):
+		params = self.build_params(*args,**kwargs)
+		K = self._K(X,*params) + np.eye(X.shape[0])*OFFSET
+		chol = np.linalg.cholesky(K)
+		chol_inv = np.linalg.inv(chol)
+		inv = np.dot(chol_inv.T,chol_inv)
+
+		return inv
 
 	def _K(self,X,*args):
 		raise NotImplemented()
