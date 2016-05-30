@@ -1,9 +1,9 @@
 
 class Kernel(object):
 
-	def __init__(self,model,logspace,*args,**kwargs):
+	def __init__(self,model,params,logspace,*args,**kwargs):
 		self.model = model
-		self.parameters = args
+		self.parameters = params
 		self.logspace = logspace
 
 	def build_params(self,*args,**kwargs):
@@ -15,7 +15,7 @@ class Kernel(object):
 
 		# look for params in kwargs
 		for p in self.parameters:
-			if p in kwargs:
+			if p in kwargs and not kwargs[p] is None:
 				params[self.parameters.index(p)] = kwargs[p]
 
 		# add any missing params from cache

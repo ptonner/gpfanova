@@ -61,7 +61,8 @@ class GP_FANOVA(SamplerContainer):
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
 
 		# kenels
-		self.mu_k = RBF(self,True,'mu_sigma','mu_lengthscale')
+		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
+		self._effect_contrast_k = [RBF(self,['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],logspace=True) for i in range(self.k)]
 
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
@@ -86,33 +87,9 @@ class GP_FANOVA(SamplerContainer):
 
 		return GPy.kern.White(self.p,variance=sigma)
 
-	# def mu_k(self,sigma=None,ls=None,history=None):
-	# 	if sigma is None:
-	# 		sigma = self.parameter_cache['mu_sigma']
-	# 	if ls is None:
-	# 		ls = self.parameter_cache['mu_lengthscale']
-	# 	if not history is None:
-	# 		sigma,ls = self.parameter_history.loc[history,'mu_sigma'], \
-	# 					self.parameter_history.loc[history,'mu_lengthscale']
-	#
-	# 	sigma = np.power(10,sigma)
-	# 	ls = np.power(10,ls)
-	#
-	# 	return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
+	def effect_contrast_k(self,i):
 
-	def effect_contrast_k(self,i,sigma=None,ls=None,history=None):
-		# sigma,ls = self.parameter_cache[["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
-		if sigma is None:
-			sigma = self.parameter_cache["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i]]
-		if ls is None:
-			ls = self.parameter_cache["%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
-		if not history is None:
-			sigma,ls = self.parameter_history.loc[history,"%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i]],self.parameter_history.loc[history,"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]
-
-		sigma = np.power(10,sigma)
-		ls = np.power(10,ls)
-
-		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
+		return self._effect_contrast_k[i]
 
 	def effect_contrast_matrix(self,i):
 		h = Sum().code_without_intercept(range(self.mk[i])).matrix
@@ -279,7 +256,7 @@ class GP_FANOVA(SamplerContainer):
 		ll = 1
 		for j in range(self.mk[i]-1):
 			mu = np.zeros(self.n)
-			cov = self.effect_contrast_k(i,sigma=sigma,ls=lengthscale).K(self.x) + np.eye(self.n)*1e-6
+			cov = self.effect_contrast_k(i).K(self.x,sigma,lengthscale) + np.eye(self.n)*1e-6
 
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
