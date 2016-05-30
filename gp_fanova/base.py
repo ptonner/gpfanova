@@ -1,5 +1,6 @@
 from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform
+from kernel import RBF
 import numpy as np
 import GPy, scipy
 
@@ -46,7 +47,6 @@ class GP_FANOVA(SamplerContainer):
 										lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
 			samplers += [Slice('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,sigma=x),.1,10)]
 			samplers += [Slice('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,lengthscale=x),.1,10)]
-		# samplers += [Slice('mu_sigma','mu_sigma',)]
 
 		# add effect transforms
 		for k in range(self.k):
@@ -59,6 +59,9 @@ class GP_FANOVA(SamplerContainer):
 
 		# contrasts
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
+
+		# kenels
+		self.mu_k = RBF(self,True,'mu_sigma','mu_lengthscale')
 
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
@@ -83,18 +86,19 @@ class GP_FANOVA(SamplerContainer):
 
 		return GPy.kern.White(self.p,variance=sigma)
 
-	def mu_k(self,sigma=None,ls=None,history=None):
-		if sigma is None:
-			sigma = self.parameter_cache['mu_sigma']
-		if ls is None:
-			ls = self.parameter_cache['mu_lengthscale']
-		if not history is None:
-			sigma,ls = self.parameter_history.loc[history,'mu_sigma'],self.parameter_history.loc[history,'mu_lengthscale']
-
-		sigma = np.power(10,sigma)
-		ls = np.power(10,ls)
-
-		return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
+	# def mu_k(self,sigma=None,ls=None,history=None):
+	# 	if sigma is None:
+	# 		sigma = self.parameter_cache['mu_sigma']
+	# 	if ls is None:
+	# 		ls = self.parameter_cache['mu_lengthscale']
+	# 	if not history is None:
+	# 		sigma,ls = self.parameter_history.loc[history,'mu_sigma'], \
+	# 					self.parameter_history.loc[history,'mu_lengthscale']
+	#
+	# 	sigma = np.power(10,sigma)
+	# 	ls = np.power(10,ls)
+	#
+	# 	return GPy.kern.RBF(self.p,variance=sigma,lengthscale=ls)
 
 	def effect_contrast_k(self,i,sigma=None,ls=None,history=None):
 		# sigma,ls = self.parameter_cache[["%s*_sigma"%GP_FANOVA.EFFECT_SUFFIXES[i],"%s*_lengthscale"%GP_FANOVA.EFFECT_SUFFIXES[i]]]
@@ -130,7 +134,8 @@ class GP_FANOVA(SamplerContainer):
 		if x is None:
 			x = self.x
 
-		k_m = self.mu_k().K(x) + np.eye(x.shape[0])*self.offset()
+		# k_m = self.mu_k().K(x) + np.eye(x.shape[0])*self.offset()
+		k_m = self.mu_k.K(x) + np.eye(x.shape[0])*self.offset()
 		chol_m = np.linalg.cholesky(k_m)
 		chol_m_inv = np.linalg.inv(chol_m)
 		m_inv = np.dot(chol_m_inv.T,chol_m_inv)
@@ -265,7 +270,8 @@ class GP_FANOVA(SamplerContainer):
 
 	def mu_likelihood(self,sigma=None,ls=None):
 		mu = np.zeros(self.n)
-		cov = self.mu_k(sigma=sigma,ls=ls).K(self.x)
+		# cov = self.mu_k(sigma=sigma,ls=ls).K(self.x)
+		cov = self.mu_k.K(self.x,sigma,ls)
 		cov += cov.mean()*np.eye(self.n)*1e-6
 		return scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.mu_index()],mu,cov)
 
