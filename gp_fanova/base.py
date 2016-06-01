@@ -60,6 +60,10 @@ class GP_FANOVA(SamplerContainer):
 
 		# contrasts
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
+		self.contrasts_interaction = {}
+		for i in range(self.k):
+			for j in range(i):
+				self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
 
 		# kenels
 		self.y_k = White(self,['y_sigma'],logspace=True)
@@ -70,13 +74,21 @@ class GP_FANOVA(SamplerContainer):
 		"""offset for the calculation of covariance matrices inverse"""
 		return 1e-9
 
-	def effect_index(self,k,l,):
+	def effect_index(self,k,l):
 		"""lth sample of kth effect"""
 		return ['%s_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
 
 	def effect_contrast_index(self,k,l,):
 		"""lth sample of kth effect"""
 		return ['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
+
+	def effect_interaction_index(self,k,l,m,n,contrast=False):
+		if k > m:
+			k,l,m,n = m,n,k,l # swapperooni
+
+		if contrast:
+			return ['(%s:%s)*_(%d,%d)(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[m],l,n,z) for z in self.x]
+		return ['(%s:%s)_(%d,%d)(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],GP_FANOVA.EFFECT_SUFFIXES[m],l,n,z) for z in self.x]
 
 	def mu_index(self):
 		return ['mu(%lf)'%z for z in self.x]
@@ -125,6 +137,30 @@ class GP_FANOVA(SamplerContainer):
 				a[:,j] = loc.loc[history,self.effect_contrast_index(i,j)]
 		return a
 
+	def effect_contrast_interaction_array(self,i,k,history=None,deriv=False):
+
+		if i > k:
+			return self.effect_contrast_array(i,k,history,deriv)
+
+		if deriv:
+			loc = self.derivative_history
+		elif not history is None:
+			loc = self.parameter_history
+		else:
+			loc = self.parameter_cache
+
+		a = np.zeros((self.n,(self.mk[i]-1)*(self.mk[k]-1)))
+		for j in range(self.mk[i]-1):
+			for l in range(self.mk[k]-1):
+				if history is None:
+					a[:,j*self.mk[k]+l] = loc[self.effect_contrast_interaction_index(i,j,k,l)]
+				else:
+					a[:,j*self.mk[k]+l] = loc.loc[history,self.effect_contrast_interaction_index(i,j,k,l)]
+		return a
+
+	def effect_contrast_interaction_index(self,i,j,k,l):
+		return j*self.mk[k] + l
+
 	def mu_conditional_params(self,history=None,cholesky=True,m_inv=None,y_inv=None):
 		m = np.zeros(self.n)
 		obs = np.zeros(self.n) # number of observations at each timepoint
@@ -133,9 +169,12 @@ class GP_FANOVA(SamplerContainer):
 		for r in range(self.r):
 			obs += 1 # all timepoints observed, need to update for nan's
 			for i in range(self.k):
-				y_effect[:,r] = self.y[:,r] - np.dot(self.effect_contrast_array(i,history), self.contrasts[i][self.effect[r,i]])
+				y_effect[:,r] = self.y[:,r] - np.dot(self.effect_contrast_array(i,history), self.contrasts[i][self.effect[r,i],:])
 
 				# need to do interaction here
+				for ii in range(i):
+					ind = self.effect_contrast_interaction_index(ii,self.effect[r,ii],i,self.effect[r,i])
+					y_effect[:,r] -= np.dot(self.effect_contrast_interaction_array(i,history), self.contrasts_interaction[(ii,i)][ind,:])
 
 		m = np.mean(y_effect,1)
 
@@ -179,6 +218,8 @@ class GP_FANOVA(SamplerContainer):
 			tot += 1
 
 			resid = self.y[:,r] - self.parameter_cache[self.mu_index()] - np.dot(contrasts,self.contrasts[i][e,:])
+
+			# subtract the interactions here
 
 			# add back in this contrast
 			resid += contrasts[:,j] * self.contrasts[i][e,j]
