@@ -118,7 +118,7 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=None,**kwargs):
 		if subplots:
 			plt.subplot(subplots[0],subplots[1],m.effect[i,k]+1)
 
-		c = colors[m.effect[i,0]]
+		c = colors[m.effect[i,k]]
 
 		plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
 		plt.ylim(m.y.min(),m.y.max())
