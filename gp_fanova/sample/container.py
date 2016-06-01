@@ -1,6 +1,6 @@
 from . import Sampler
 import pandas as pd
-import time
+import time,logging
 
 class SamplerContainer(object):
 
@@ -42,6 +42,7 @@ class SamplerContainer(object):
 			self.parameter_cache[sampler.parameters] = sample
 
 	def sample(self,n=1,save=0,verbose=False):
+		logger = logging.getLogger(__name__)
 		start = self.parameter_history.shape[0]
 		i = 1
 
@@ -52,16 +53,13 @@ class SamplerContainer(object):
 			if save == 0 or i % save == 0:
 				self.store()
 
-				if verbose:
-					j = self.parameter_history.shape[0] - start
-
-					print "%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60)
-					iter_time = time.time()
+				j = self.parameter_history.shape[0] - start
+				logger.debug("%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60))
+				iter_time = time.time()
 
 			i+=1
 
-		if verbose:
-			print "%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60)
+		logger.debug("%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60))
 
 	def store(self):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
