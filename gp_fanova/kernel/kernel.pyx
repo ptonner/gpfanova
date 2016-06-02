@@ -32,7 +32,7 @@ class Kernel(object):
 
 		if self.logspace:
 			for i in range(len(params)):
-				params[i] = 10**params[i]
+				params[i] = pow(10,params[i])
 
 		return params
 

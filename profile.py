@@ -9,7 +9,7 @@ import data,gp_fanova
 x,y,effect = data.hsalinarum_strain_data(['trmB','rosR'])
 m = gp_fanova.base.GP_FANOVA(x,y,effect)
 def profile():
-	m.sample(10,1)
+	m.sample(500,1)
 
 cProfile.runctx("profile()", globals(), locals(), "Profile.prof")
 

@@ -38,6 +38,13 @@ class GP_FANOVA(SamplerContainer):
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
+		# indexes
+		self._effect_contrast_index = []
+		for k in range(self.k):
+			self._effect_contrast_index.append([])
+			for l in range(self.mk[k]):
+				self._effect_contrast_index[-1].append(['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x])
+
 		# kenels
 		self.y_k = White(self,['y_sigma'],logspace=True)
 		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
@@ -91,10 +98,12 @@ class GP_FANOVA(SamplerContainer):
 						self._tuple_to_design_index[(i,j,k,l)] = ind
 						ind += 1
 
+		self._build_design_matrix()
+
 	def _tuple_to_design_ind(self,tup):
 		return self._tuple_to_design_index[tup]
 
-	def design_matrix(self):
+	def _build_design_matrix(self):
 
 		d = 1
 		for i in range(self.k):
@@ -116,7 +125,10 @@ class GP_FANOVA(SamplerContainer):
 					z = self.effect_contrast_interaction_index(i,self.effect[s,i],j,self.effect[s,j])
 					x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
 
-		return x
+		self._design_matrix = x
+
+	def design_matrix(self):
+		return self._design_matrix
 
 	def function_matrix(self,remove=[]):
 
@@ -172,7 +184,8 @@ class GP_FANOVA(SamplerContainer):
 
 	def effect_contrast_index(self,k,l,):
 		"""lth sample of kth effect"""
-		return ['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
+		#return ['%s*_%d(%lf)'%(GP_FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self.x]
+		return self._effect_contrast_index[k][l]
 
 	def effect_interaction_index(self,k,l,m,n,contrast=False):
 		if k > m:
@@ -304,7 +317,7 @@ class GP_FANOVA(SamplerContainer):
 		for j in range(self.mk[i]-1):
 			mu = np.zeros(self.n)
 			cov = self.effect_contrast_k(i).K(self.x,sigma,lengthscale) + np.eye(self.n)*1e-6
-
+			cov += cov.mean()*np.eye(self.n)*1e-6
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
 			except np.linalg.LinAlgError:

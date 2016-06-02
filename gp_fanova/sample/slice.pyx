@@ -21,7 +21,10 @@ class Slice(Sampler):
 		self.w = w
 		self.m = m
 
-	def _sample(self,x):
+	def _sample(self,double x):
+
+		cdef double z, u, l, r, f0, x1;
+		cdef int j,k;
 
 		f0 = self.logdensity_fxn(x)
 		z = f0 - scipy.stats.expon.rvs(1)
