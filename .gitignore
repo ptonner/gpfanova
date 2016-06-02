@@ -1,3 +1,5 @@
 *.png
 *.pyc
+*.so
+*.c
 *.csv
