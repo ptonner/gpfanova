@@ -36,17 +36,25 @@ class GP_FANOVA(SamplerContainer):
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
+		# kenels
+		self.y_k = White(self,['y_sigma'],logspace=True)
+		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
+		self._effect_contrast_k = [RBF(self,['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],logspace=True) for i in range(self.k)]
+
 		# SamplerContainer
-		# samplers = [Fixed('y_sigma','y_sigma',)]
 		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,.1,10)]
-		samplers += [Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
+		# samplers += [Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
+		samplers += [Gibbs('mu',self.mu_index(),lambda f=0,k=self.mu_k: self.function_conditional(f,k))]
 		samplers += [Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
 		samplers += [Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
 				samplers.append(Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
 										self.effect_contrast_index(i,j),
-										lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
+										lambda i=i,j=j,k=self._effect_contrast_k[i] : self.function_conditional((i,j),k)))
+				# samplers.append(Gibbs('%s*_%d'%(GP_FANOVA.EFFECT_SUFFIXES[i],j),
+				# 						self.effect_contrast_index(i,j),
+				# 						lambda i=i,j=j : self.effect_contrast_conditional_params(i,j)))
 			samplers += [Slice('%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,sigma=x),.1,10)]
 			samplers += [Slice('%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i],lambda x: self.effect_contrast_likelihood(i=i,lengthscale=x),.1,10)]
 
@@ -65,11 +73,6 @@ class GP_FANOVA(SamplerContainer):
 		for i in range(self.k):
 			for j in range(i):
 				self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
-
-		# kenels
-		self.y_k = White(self,['y_sigma'],logspace=True)
-		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
-		self._effect_contrast_k = [RBF(self,['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],logspace=True) for i in range(self.k)]
 
 		# indices
 		self._tuple_to_design_index = {}
@@ -247,6 +250,23 @@ class GP_FANOVA(SamplerContainer):
 
 	def effect_contrast_interaction_index(self,i,j,k,l):
 		return j*self.mk[k] + l
+
+	def function_conditional(self,f,kern):
+		m = self.function_residual(f)
+		n = m.shape[0]
+		m = m.mean(0)
+
+		f_inv = kern.K_inv(self.x)
+		y_inv = self.y_k.K_inv(self.x)
+
+		A = n*y_inv + f_inv
+		b = n*np.dot(y_inv,m)
+
+		chol_A = np.linalg.cholesky(A)
+		chol_A_inv = np.linalg.inv(chol_A)
+		A_inv = np.dot(chol_A_inv.T,chol_A_inv)
+
+		return np.dot(A_inv,b), A_inv
 
 	def mu_conditional_params(self,history=None,cholesky=True,m_inv=None,y_inv=None):
 		m = np.zeros(self.n)
