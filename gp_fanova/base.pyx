@@ -283,7 +283,7 @@ class GP_FANOVA(SamplerContainer):
 		# 			mu[i*self.n:(i+1)*self.n] += self.effect_sample(k,l)
 
 		# return mu
-		return self.residual().ravel()
+		return np.dot(self.design_matrix(),self.function_matrix().T).ravel()
 
 	def y_likelihood(self,sigma=None):
 		y = np.ravel(self.y.T)
