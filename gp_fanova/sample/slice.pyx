@@ -1,3 +1,5 @@
+# cython: profile=True
+
 from . import Sampler
 import scipy
 

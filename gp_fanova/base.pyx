@@ -1,8 +1,10 @@
+# cython: profile=True
+
 from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform
 from kernel import RBF, White
 import numpy as np
-import GPy, scipy
+import GPy, scipy, logging
 
 class GP_FANOVA(SamplerContainer):
 
@@ -273,14 +275,15 @@ class GP_FANOVA(SamplerContainer):
 		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
 
 	def y_mu(self):
-		mu = np.zeros(self.n*self.r)
-		for i in range(self.r):
-			mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.mu_index()]
-			for k in range(self.k):
-				for l in range(self.mk[k]-1):
-					mu[i*self.n:(i+1)*self.n] += self.effect_sample(k,l)
+		# mu = np.zeros(self.n*self.r)
+		# for i in range(self.r):
+		# 	mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.mu_index()]
+		# 	for k in range(self.k):
+		# 		for l in range(self.mk[k]-1):
+		# 			mu[i*self.n:(i+1)*self.n] += self.effect_sample(k,l)
 
-		return mu
+		# return mu
+		return self.residual().ravel()
 
 	def y_likelihood(self,sigma=None):
 		y = np.ravel(self.y.T)
@@ -305,6 +308,7 @@ class GP_FANOVA(SamplerContainer):
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
 			except np.linalg.LinAlgError:
-				print "likelihood LinAlgError (%d,%d)" % (i,j)
+				logger = logging.getLogger(__name__)
+				logger.error("likelihood LinAlgError (%d,%d)" % (i,j))
 
 		return ll
