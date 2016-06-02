@@ -28,6 +28,7 @@ class GP_FANOVA(SamplerContainer):
 		self.n = self.x.shape[0]
 		assert self.y.shape[0] == self.n, 'x and y must have same first dimension shape!'
 		self.p = self.x.shape[1]
+		self.m = self.y.shape[1]
 
 		self.r = self.nt = self.y.shape[1]
 		assert self.r == self.effect.shape[0], 'y second dimension must match effect first dimension'
@@ -69,6 +70,92 @@ class GP_FANOVA(SamplerContainer):
 		self.y_k = White(self,['y_sigma'],logspace=True)
 		self.mu_k = RBF(self,['mu_sigma','mu_lengthscale'],logspace=True)
 		self._effect_contrast_k = [RBF(self,['%s*_sigma'%GP_FANOVA.EFFECT_SUFFIXES[i],'%s*_lengthscale'%GP_FANOVA.EFFECT_SUFFIXES[i]],logspace=True) for i in range(self.k)]
+
+		# indices
+		self._tuple_to_design_index = {}
+		self._tuple_to_design_index[0] = 0
+		ind = 1
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				self._tuple_to_design_index[(i,j)] = ind
+				ind += 1
+		for i in range(self.k):
+			for j in range(self.mk[i]):
+				for k in range(i+1,self.k):
+					for l in range(self.mk[k]):
+						self._tuple_to_design_index[(i,j,k,l)] = ind
+						ind += 1
+
+	def _tuple_to_design_ind(self,tup):
+		return self._tuple_to_design_index[tup]
+
+	def design_matrix(self):
+
+		d = 1
+		for i in range(self.k):
+			d += self.mk[i] - 1
+			for j in range(i):
+				d += (self.mk[i] - 1) * (self.mk[j] - 1)
+
+		x = np.zeros((self.m,d))
+		x[:,0] = 1
+
+		for s in range(self.m):
+			ind = 1
+			for i in range(self.k):
+				x[s,ind:ind+self.mk[i]-1] = self.contrasts[i][self.effect[s,i],:]
+				ind += self.mk[i]-1
+
+			for i in range(self.k):
+				for j in range(i+1,self.k):
+					z = self.effect_contrast_interaction_index(i,self.effect[s,i],j,self.effect[s,j])
+					x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
+
+		return x
+
+	def function_matrix(self,remove=[]):
+
+		if 0 in remove:
+			functions = [None]
+		else:
+			functions = [self.mu_index()]
+
+		for i in range(self.k):
+			for j in range(self.mk[i]-1):
+				if (i,j) in remove:
+					functions.append(None)
+				else:
+					functions.append(self.effect_contrast_index(i,j))
+
+		for i in range(self.k):
+			for k in range(i+1,self.k):
+				for j in range(self.mk[i]-1):
+					for l in range(self.mk[k]-1):
+						if (i,j,k,l) in remove:
+							functions.append(None)
+						else:
+							functions.append(self.effect_contrast_interaction_index(i,j,k,l))
+
+		f = np.zeros((self.n,len(functions)))
+
+		for i,z in enumerate(functions):
+			if z is None:
+				f[:,i] = 0
+			else:
+				f[:,i] = self.parameter_cache[z]
+
+		return f
+
+	def residual(self,remove=[]):
+		return self.y.T - np.dot(self.design_matrix(),self.function_matrix(remove).T)
+
+	def function_residual(self,f):
+		resid = self.residual(remove=[f])
+
+		resid = (resid.T / self.design_matrix()[:,self._tuple_to_design_ind(f)].T).T
+		resid = resid[self.design_matrix()[:,self._tuple_to_design_ind(f)]!=0,:]
+
+		return resid
 
 	def offset(self):
 		"""offset for the calculation of covariance matrices inverse"""
