@@ -288,20 +288,12 @@ class GP_FANOVA(SamplerContainer):
 		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
 
 	def y_mu(self):
-		# mu = np.zeros(self.n*self.r)
-		# for i in range(self.r):
-		# 	mu[i*self.n:(i+1)*self.n] += self.parameter_cache[self.mu_index()]
-		# 	for k in range(self.k):
-		# 		for l in range(self.mk[k]-1):
-		# 			mu[i*self.n:(i+1)*self.n] += self.effect_sample(k,l)
-
-		# return mu
 		return np.dot(self.design_matrix(),self.function_matrix().T).ravel()
 
 	def y_likelihood(self,sigma=None):
 		y = np.ravel(self.y.T)
 		mu = self.y_mu()
-		sigma = 10**sigma
+		sigma = pow(10,sigma)
 
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
