@@ -6,6 +6,14 @@ import GPy, scipy, logging
 
 class Base(SamplerContainer):
 
+	"""Base for constructing functional models of the form $y(t) = X \times b(t)$
+
+	Subclasses must implement the functions _build_design_matrix and prior_groups.
+	_build_design_matrix defines the design matrix for the model, such that
+	$y_i(t) = X_i b(t)$ for design matrix $X$. prior_groups returns a list of lists,
+	where each list defines a grouping of functions who share a GP prior.
+	"""
+
 	def __init__(self,x,y,fxn_names={}):
 
 		self.x = x # independent variables
@@ -44,8 +52,6 @@ class Base(SamplerContainer):
 
 			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),.1,10))
 			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),.1,10))
-			# samplers.append(Fixed('prior%d_sigma'%i,'prior%d_sigma'%i))
-			# samplers.append(Fixed('prior%d_lengthscale'%i,'prior%d_lengthscale'%i))
 
 		SamplerContainer.__init__(self,*samplers)
 
@@ -110,7 +116,16 @@ class Base(SamplerContainer):
 	def y_mu(self):
 		return np.dot(self.design_matrix,self.function_matrix().T).ravel()
 
+	def y_likelihood(self,sigma=None):
+		"""Compute the likelihood of the observations y given the design matrix and latent functions"""
+		y = np.ravel(self.y.T)
+		mu = self.y_mu()
+		sigma = pow(10,sigma)
+
+		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
+
 	def prior_likelihood(self,p,sigma=None,lengthscale=None):
+		"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
 		ind = self.prior_groups()[p]
 
 		mu = np.zeros(self.n)
@@ -125,10 +140,3 @@ class Base(SamplerContainer):
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
 		return ll
-
-	def y_likelihood(self,sigma=None):
-		y = np.ravel(self.y.T)
-		mu = self.y_mu()
-		sigma = pow(10,sigma)
-
-		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
