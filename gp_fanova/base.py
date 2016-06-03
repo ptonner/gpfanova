@@ -38,8 +38,10 @@ class Base(SamplerContainer):
 			for f in p:
 				samplers.append(Function('f%d'%f,self.function_index(f),self,f,self.kernels[-1]))
 
-			samplers.append(Fixed('prior%d_sigma'%i,'prior%d_sigma'%i))
-			samplers.append(Fixed('prior%d_lengthscale'%i,'prior%d_lengthscale'%i))
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),.1,10))
+			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),.1,10))
+			# samplers.append(Fixed('prior%d_sigma'%i,'prior%d_sigma'%i))
+			# samplers.append(Fixed('prior%d_lengthscale'%i,'prior%d_lengthscale'%i))
 
 		SamplerContainer.__init__(self,*samplers)
 
@@ -103,6 +105,22 @@ class Base(SamplerContainer):
 
 	def y_mu(self):
 		return np.dot(self.design_matrix,self.function_matrix().T).ravel()
+
+	def prior_likelihood(self,p,sigma=None,lengthscale=None):
+		ind = self.prior_groups()[p]
+
+		mu = np.zeros(self.n)
+		cov = self.kernels[p].K(self.x,sigma,lengthscale)
+		cov += cov.mean()*np.eye(self.n)*1e-6
+
+		ll = 1
+		for f in ind:
+			try:
+				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.function_index(f)],mu,cov)
+			except np.linalg.LinAlgError:
+				logger = logging.getLogger(__name__)
+				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
+		return ll
 
 	def y_likelihood(self,sigma=None):
 		y = np.ravel(self.y.T)
