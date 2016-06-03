@@ -52,7 +52,6 @@ class GP_FANOVA(SamplerContainer):
 
 		# SamplerContainer
 		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,.1,10)]
-		# samplers += [Gibbs('mu',self.mu_index(),self.mu_conditional_params)]
 		samplers += [Gibbs('mu',self.mu_index(),lambda f=0,k=self.mu_k: self.function_conditional(f,k))]
 		samplers += [Slice('mu_sigma','mu_sigma',self.mu_likelihood,.1,10)]
 		samplers += [Slice('mu_lengthscale','mu_lengthscale',self.mu_likelihood,.1,10)]
@@ -283,6 +282,8 @@ class GP_FANOVA(SamplerContainer):
 
 		return np.dot(A_inv,b), A_inv
 
+	# def derivative_conditional(self,f,kern):
+
 	def effect_sample(self,i,j):
 
 		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
@@ -308,7 +309,7 @@ class GP_FANOVA(SamplerContainer):
 		ll = 1
 		for j in range(self.mk[i]-1):
 			mu = np.zeros(self.n)
-			cov = self.effect_contrast_k(i).K(self.x,sigma,lengthscale) + np.eye(self.n)*1e-6
+			cov = self.effect_contrast_k(i).K(self.x,sigma,lengthscale)
 			cov += cov.mean()*np.eye(self.n)*1e-6
 			try:
 				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.effect_contrast_index(i,j)],mu,cov)
