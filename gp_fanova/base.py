@@ -1,5 +1,3 @@
-# cython: profile=True
-
 from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform, Function
 from kernel import RBF, White
@@ -8,9 +6,7 @@ import GPy, scipy, logging
 
 class Base(SamplerContainer):
 
-	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
-
-	def __init__(self,x,y):
+	def __init__(self,x,y,fxn_names={}):
 
 		self.x = x # independent variables
 		self.y = y # dependent variables
@@ -26,6 +22,10 @@ class Base(SamplerContainer):
 		# number of functions being estimated
 		self.f = self.design_matrix.shape[1]
 
+		if self.f > np.linalg.matrix_rank(self.design_matrix):
+			logger = logging.getLogger(__name__)
+			logger.error("design matrix is of rank %d, but there are %d functions!"%(np.linalg.matrix_rank(self.design_matrix),self.f))
+
 		# kernel and sampler
 		self.y_k = White(self,['y_sigma'],logspace=True)
 		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,.1,10)]
@@ -36,7 +36,11 @@ class Base(SamplerContainer):
 			self.kernels.append(RBF(self,['prior%d_sigma'%i,'prior%d_lengthscale'%i],logspace=True))
 
 			for f in p:
-				samplers.append(Function('f%d'%f,self.function_index(f),self,f,self.kernels[-1]))
+				if f in fxn_names:
+					s = fxn_names[f]
+				else:
+					s = "f%d"%f
+				samplers.append(Function('%s'%s,self.function_index(f),self,f,self.kernels[-1]))
 
 			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),.1,10))
 			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),.1,10))
@@ -50,13 +54,13 @@ class Base(SamplerContainer):
 			self.design_matrix = self._build_design_matrix()
 
 	def _build_design_matrix(self):
-		raise NotImplemented("Implement a design matrix for your model!")
+		raise NotImplementedError("Implement a design matrix for your model!")
 
 	def function_index(self,i):
 		return ['f%d(%lf)'%(i,z) for z in self.x]
 
 	def prior_groups(self):
-		raise NotImplemented("Implement a prior grouping function for your model!")
+		raise NotImplementedError("Implement a prior grouping function for your model!")
 
 	def function_matrix(self,remove=[],only=[]):
 

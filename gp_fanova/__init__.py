@@ -1,5 +1,6 @@
 import base
 import mean
+import fanova
 import kernel
 import plot
 import sample
