@@ -1,11 +1,10 @@
 from patsy.contrasts import Sum
-from sample import SamplerContainer, Gibbs, Slice, Fixed, Transform, Function
+from sample import SamplerContainer, Gibbs, Slice, Fixed, Function
 from kernel import RBF, White
 import numpy as np
 import GPy, scipy, logging
 
 class Base(SamplerContainer):
-
 	"""Base for constructing functional models of the form $y(t) = X \times b(t)$
 
 	Subclasses must implement the functions _build_design_matrix and prior_groups.
@@ -15,6 +14,16 @@ class Base(SamplerContainer):
 	"""
 
 	def __init__(self,x,y,fxn_names={}):
+		""" Construct the base functional model.
+
+		Args:
+			x: np.array (n x p), independent variables (not the design matrix!),
+				where obesrvations have been made
+			y: np.array (n x r), funtion observations
+			fxn_names: dict(index:name), keys indicate function index in the
+				design matrix, with values representing the name to use for the
+				function.
+		"""
 
 		self.x = x # independent variables
 		self.y = y # dependent variables
@@ -52,23 +61,52 @@ class Base(SamplerContainer):
 
 			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),.1,10))
 			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),.1,10))
+		samplers.extend(self._additional_samplers())
 
 		SamplerContainer.__init__(self,*samplers)
+
+	def _additional_samplers(self):
+		"""Additional samplers for the model, can be overwritten by subclasses."""
+		return []
 
 	def build_design_matrix(self):
 		if self.design_matrix is None:
 			self.design_matrix = self._build_design_matrix()
 
 	def _build_design_matrix(self):
+		"""Build a design matrix defining the relation between observations and underlying functions.
+
+		The returned matrix should be shape (n,f), where n is the number observation points,
+		and f is the number of functions to be estimated. f will be infered by the
+		shape of the matrix returned from this function.
+		"""
 		raise NotImplementedError("Implement a design matrix for your model!")
 
 	def function_index(self,i):
-		return ['f%d(%lf)'%(i,z) for z in self.x]
+		"""return the parameter_cache indices for function i"""
+		return ['f%d(%s)'%(i,z) for z in self._observation_index_base()]
+
+	def _observation_index_base(self):
+		"""return the base indice structure from the observations.
+
+		returns:
+			list of strings
+		"""
+		return ['%s'%str(z) for z in self.x]
 
 	def prior_groups(self):
 		raise NotImplementedError("Implement a prior grouping function for your model!")
 
+	def _prior_parameters(self,i):
+		if i < 0:
+			return ['y_sigma']
+		if i >= len(self.prior_groups()):
+			return [None]
+
+		return ['prior%d_sigma'%i,'prior%d_lengthscale'%i]
+
 	def function_matrix(self,remove=[],only=[]):
+		"""return the current function values, stored in the parameter_cache."""
 
 		functions = []
 
