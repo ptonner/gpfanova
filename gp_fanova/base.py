@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,fxn_names={}):
+	def __init__(self,x,y):
 		""" Construct the base functional model.
 
 		Args:
@@ -49,6 +49,7 @@ class Base(SamplerContainer):
 
 		# function priors
 		self.kernels = []
+		fxn_names = self.function_names()
 		for i,p in enumerate(self.prior_groups()):
 			self.kernels.append(RBF(self,['prior%d_sigma'%i,'prior%d_lengthscale'%i],logspace=True))
 
@@ -68,6 +69,10 @@ class Base(SamplerContainer):
 	def _additional_samplers(self):
 		"""Additional samplers for the model, can be overwritten by subclasses."""
 		return []
+
+	def function_names(self):
+		"""Function names, can be overwritten by subclasses."""
+		return {}
 
 	def build_design_matrix(self):
 		if self.design_matrix is None:
