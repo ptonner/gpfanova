@@ -59,7 +59,8 @@ class SamplerContainer(object):
 
 			i+=1
 
-		logger.debug("%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60))
+		if verbose:
+			logger.info("%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60))
 
 	def store(self):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
