@@ -1,4 +1,5 @@
 from base import Base
+from sample import Transform
 import numpy as np
 from patsy.contrasts import Sum
 
@@ -18,6 +19,26 @@ class FANOVA(Base):
 				self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
 
 		Base.__init__(self,x,y,fxn_names=self.fxn_names())
+
+	def _additional_samplers(self):
+		ret = []
+
+		for k in range(self.k):
+			for l in range(self.mk[k]):
+				ret.append(Transform('%s_%d'%(FANOVA.EFFECT_SUFFIXES[k],l),
+										self.effect_index_to_cache(k,l),
+										lambda k=k,l=l : self.effect_sample(k,l)))
+
+		return ret
+
+	def effect_contrast_array(self,i,deriv=False):
+
+		ind = range(self.effect_index(i,0),self.effect_index(i+1,0))
+		return self.function_matrix(only=ind)
+
+	def effect_sample(self,i,j):
+
+		return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
 
 	def effect_contrast_matrix(self,i):
 		h = Sum().code_without_intercept(range(self.mk[i])).matrix
@@ -41,8 +62,12 @@ class FANOVA(Base):
 
 		return fxn_names
 
+	def effect_index_to_cache(self,k,l):
+		"""return effect index to parameter cache"""
+		return ["%s_%d(%s)" % (FANOVA.EFFECT_SUFFIXES[k],l,z) for z in self._observation_index_base()]
+
 	def effect_index(self,i,j):
-		return 1 + sum(self.mk[:i]) + j
+		return 1 + sum([m-1 for m in self.mk[:i]]) + j
 
 	def effect_interaction_index(self,i,j,k,l):
 		if i > k:
