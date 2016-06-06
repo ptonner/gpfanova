@@ -78,9 +78,9 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
 
 		# samples = m.effect_samples(k,j)[burnin:,:]
-		samples = m.parameter_history[m.effect_index(k,j)].values[burnin:,:]
+		samples = m.parameter_history[m.effect_index_to_cache(k,j)].values[burnin:,:]
 		if offset:
-			samples += m.parameter_history[m.mu_index()].values[burnin:,:]
+			samples += m.parameter_history[m.function_index(0)].values[burnin:,:]
 
 		mean = samples.mean(0)
 		std = samples.std(0)
@@ -100,8 +100,8 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 				plt.ylim(ylim)
 
 	if _mean:
-		mean = m.parameter_history[m.mu_index()].values[burnin:,:].mean(0)
-		std = m.parameter_history[m.mu_index()].values[burnin:,:].std(0)
+		mean = m.parameter_history[m.function_index(0)].values[burnin:,:].mean(0)
+		std = m.parameter_history[m.function_index(0)].values[burnin:,:].std(0)
 
 		if variance:
 			plt.plot(m.x,std,color='k')

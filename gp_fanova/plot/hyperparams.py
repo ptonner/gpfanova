@@ -28,10 +28,9 @@ def _plot_param_correlation(m,param1,param2,logspace=True):
 
 def _plot_hyper_params_correlative(m,logspace,*args,**kwargs):
 
-	params = ['y_sigma','mu_sigma','mu_lengthscale']
-	for i in range(m.k):
-		params += ['%s*_sigma'%m.EFFECT_SUFFIXES[i],
-				   '%s*_lengthscale'%m.EFFECT_SUFFIXES[i]]
+	params = ['y_sigma']
+	for i in range(len(m.prior_groups())):
+		params.extend(m._prior_parameters(i))
 
 	s = len(params)
 
@@ -73,27 +72,13 @@ def _plot_hyper_params_histogram(m,logspace,*args,**kwargs):
 			plt.hist(10**m.parameter_history[param])
 		plt.title(param,fontsize=20)
 
-	params = ['y_sigma','','mu_sigma','mu_lengthscale']
-	for i in range(m.k):
-		params += ['%s*_sigma'%m.EFFECT_SUFFIXES[i],
-				   '%s*_lengthscale'%m.EFFECT_SUFFIXES[i]]
+	params = ['y_sigma']
+	for i in range(len(m.prior_groups)):
+		params.append(m._prior_parameters(i))
 
-	s = 2 + m.k
+	s = len(params)
 	for i in range(len(params)):
 		if params[i] == '':
 			continue
 		plt.subplot(s,2,i+1)
 		plot_param(params[i])
-
-	# nrows = 1 + m.k
-	#
-	# plt.subplot(nrows,2,1)
-	# plot_param('mu_sigma')
-	# plt.subplot(nrows,2,2)
-	# plot_param('mu_lengthscale')
-	#
-	# for i in range(m.k):
-	# 	plt.subplot(nrows,2,2+2*i+1)
-	# 	plot_param('%s*_sigma'%m.EFFECT_SUFFIXES[i])
-	# 	plt.subplot(nrows,2,2+2*i+2)
-	# 	plot_param('%s*_lengthscale'%m.EFFECT_SUFFIXES[i])
