@@ -254,6 +254,38 @@ def hsalinarum_replicate_data():
 
 	return x,y,effect
 
+def hsalinarum_beer_data():
+	data = pd.read_csv("data/hsalinarum/beer_et_al_2014/combined.csv",index_col=None)
+
+	time_ind = 563
+
+	x = data.columns[:time_ind].values.astype(float)
+	y = data.iloc[:,:time_ind].values
+
+	effect = data[['KCl.Concentration','MgSO4.Concentration','NaCl.Concentration','Total.Concentration']]
+
+	effect.columns = effect.columns.str.replace(".","_")
+	effect.values[:,:3] = (effect.values[:,:3]/effect.Total_Concentration.values[:,None])
+
+	effect.loc[:,'KCl_Concentration'] = effect.KCl_Concentration.factorize(sort=True)[0]
+	effect.loc[:,'MgSO4_Concentration'] = effect.MgSO4_Concentration.factorize(sort=True)[0]
+	effect.loc[:,'NaCl_Concentration'] = effect.NaCl_Concentration.factorize(sort=True)[0]
+	effect.loc[:,'Total_Concentration'] = effect.Total_Concentration.factorize(sort=True)[0]
+	effect = effect.values
+
+	select = x < 50
+	x = x[select]
+	y = y[:,select]
+
+	select = np.arange(0,x.shape[0],4)
+	x = x[select]
+	y = y[:,select]
+
+	x = x[:,None]
+	y = y.T
+
+	return x,y,effect
+
 def plot_model_vs_true(m,mean,effect,interaction):
 
 	nrows = 3
