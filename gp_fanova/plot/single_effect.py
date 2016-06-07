@@ -61,7 +61,7 @@ def _plot_single_effect_derivative(m,k,subplots=None,_mean=False,offset=False,va
 			plt.plot(m.x,mean,'k')
 			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
 
-def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,variance=False,burnin=None,**kwargs):
+def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,variance=False,burnin=None,labels=None,**kwargs):
 
 	if burnin is None:
 		burnin = 0
@@ -96,7 +96,10 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 		if variance:
 			plt.plot(m.x,std,color=c)
 		else:
-			plt.plot(m.x,mean,color=c)
+			l = None
+			if not labels is None and len(labels)>j:
+				l = str(labels[j])
+			plt.plot(m.x,mean,color=c,label=l)
 			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
 
 			if subplots:
@@ -111,6 +114,9 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 		else:
 			plt.plot(m.x,mean,'k')
 			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')
+
+	if not labels is None:
+		plt.legend(loc="best")
 
 def _plot_single_effect_data(m,k,subplots=False,alpha=None,**kwargs):
 	if alpha is None:
