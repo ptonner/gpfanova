@@ -20,9 +20,6 @@ class Base(SamplerContainer):
 			x: np.array (n x p), independent variables (not the design matrix!),
 				where obesrvations have been made
 			y: np.array (n x r), funtion observations
-			fxn_names: dict(index:name), keys indicate function index in the
-				design matrix, with values representing the name to use for the
-				function.
 		"""
 
 		self.x = x # independent variables
@@ -71,7 +68,12 @@ class Base(SamplerContainer):
 		return []
 
 	def function_names(self):
-		"""Function names, can be overwritten by subclasses."""
+		"""Function names, can be overwritten by subclasses.
+
+		returns:
+			dict(index:name), keys indicate function index in the
+				design matrix, with values representing the name to use for the
+				function."""
 		return {}
 
 	def build_design_matrix(self):
