@@ -139,6 +139,7 @@ class Base(SamplerContainer):
 		return self.y.T - np.dot(self.design_matrix,self.function_matrix(remove,only).T)
 
 	def function_residual(self,f):
+		"""compute the residual Y-Mb, without the function f."""
 		resid = self.residual(remove=[f])
 
 		resid = (resid.T / self.design_matrix[:,f].T).T
