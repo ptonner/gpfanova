@@ -69,6 +69,9 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 	if subplots:
 		ylim = (1e9,-1e9)
 
+	if m.mk[k] > len(colors):
+		_cmap = plt.get_cmap('spectral')
+
 	for j in range(m.mk[k]):
 
 		if m.mk[k] <= len(colors):
