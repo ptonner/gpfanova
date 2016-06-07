@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y):
+	def __init__(self,x,y,hyperparam_kwargs={},*args,**kwargs):
 		""" Construct the base functional model.
 
 		Args:
@@ -42,7 +42,12 @@ class Base(SamplerContainer):
 
 		# kernel and sampler
 		self.y_k = White(self,['y_sigma'],logspace=True)
-		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,.1,10)]
+		w,m = .1,10
+		if 'y_sigma' in hyperparam_kwargs:
+			w,m = hyperparam_kwargs['y_sigma']
+		elif 'sigma' in hyperparam_kwargs:
+			w,m = hyperparam_kwargs['sigma']
+		samplers = [Slice('y_sigma','y_sigma',self.y_likelihood,w,m)]
 
 		# function priors
 		self.kernels = []
@@ -57,11 +62,18 @@ class Base(SamplerContainer):
 					s = "f%d"%f
 				samplers.append(Function('%s'%s,self.function_index(f),self,f,self.kernels[-1]))
 
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),.1,10))
-			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),.1,10))
+			w,m = .1,10
+			if 'sigma' in hyperparam_kwargs:
+				w,m = hyperparam_kwargs['sigma']
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),w,m))
+
+			w,m = .1,10
+			if 'lengthscale' in hyperparam_kwargs:
+				w,m = hyperparam_kwargs['lengthscale']
+			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),w,m))
 		samplers.extend(self._additional_samplers())
 
-		SamplerContainer.__init__(self,*samplers)
+		SamplerContainer.__init__(self,*samplers,**kwargs)
 
 	def _additional_samplers(self):
 		"""Additional samplers for the model, can be overwritten by subclasses."""

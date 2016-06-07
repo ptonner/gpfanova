@@ -7,7 +7,7 @@ class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=None):
+	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=None,*args,**kwargs):
 		self.effect = effect
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
@@ -26,7 +26,7 @@ class FANOVA(Base):
 				if (j,i) in interactions or (i,j) in interactions:
  					self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
 
-		Base.__init__(self,x,y)
+		Base.__init__(self,x,y,*args,**kwargs)
 
 	def has_interaction(self,i,k):
 		return (i,k) in self.interactions or (k,i) in self.interactions
