@@ -7,10 +7,13 @@ class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect,interactions=None):
+	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=None):
 		self.effect = effect
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
+
+		self.effect_transforms = effect_transforms
+		self.interaction_transforms = interaction_transforms
 
 		if interactions is None:
 			interactions = []
@@ -32,19 +35,21 @@ class FANOVA(Base):
 		ret = []
 
 		for k in range(self.k):
-			for l in range(self.mk[k]):
-				ret.append(Transform('%s_%d'%(FANOVA.EFFECT_SUFFIXES[k],l),
-										self.effect_index_to_cache(k,l),
-										lambda k=k,l=l : self.effect_sample(k,l)))
+			if self.effect_transforms:
+				for l in range(self.mk[k]):
+					ret.append(Transform('%s_%d'%(FANOVA.EFFECT_SUFFIXES[k],l),
+											self.effect_index_to_cache(k,l),
+											lambda k=k,l=l : self.effect_sample(k,l)))
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
-				if self.has_interaction(i,k):
-					for l in range(self.mk[k]):
-						for j in range(self.mk[i]):
-							ret.append(Transform('(%s,%s)_(%d,%d)'%(FANOVA.EFFECT_SUFFIXES[k],FANOVA.EFFECT_SUFFIXES[i],l,j),
-											self.effect_index_to_cache(k,l,i,j),
-											lambda k=k,l=l,i=i,j=j : self.effect_sample(k,l,i,j)))
+				if self.interaction_transforms:
+					if self.has_interaction(i,k):
+						for l in range(self.mk[k]):
+							for j in range(self.mk[i]):
+								ret.append(Transform('(%s,%s)_(%d,%d)'%(FANOVA.EFFECT_SUFFIXES[k],FANOVA.EFFECT_SUFFIXES[i],l,j),
+												self.effect_index_to_cache(k,l,i,j),
+												lambda k=k,l=l,i=i,j=j : self.effect_sample(k,l,i,j)))
 
 		return ret
 
