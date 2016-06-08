@@ -7,29 +7,26 @@ class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=None,*args,**kwargs):
+	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=False,*args,**kwargs):
 		self.effect = effect
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
 		self.effect_transforms = effect_transforms
 		self.interaction_transforms = interaction_transforms
-
-		if interactions is None:
-			interactions = []
 		self.interactions = interactions
 
 		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
 		self.contrasts_interaction = {}
 		for i in range(self.k):
 			for j in range(i):
-				if (j,i) in interactions or (i,j) in interactions:
+				if self.interactions:
  					self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
 
 		Base.__init__(self,x,y,*args,**kwargs)
 
 	def has_interaction(self,i,k):
-		return (i,k) in self.interactions or (k,i) in self.interactions
+		return self.interactions
 
 	def _additional_samplers(self):
 		ret = []
@@ -142,7 +139,7 @@ class FANOVA(Base):
 		for i in range(self.k):
 			d += self.mk[i] - 1
 			for j in range(i):
-				if (i,j) in self.interactions or (j,i) in self.interactions:
+				if self.interactions:
 					d += (self.mk[i] - 1) * (self.mk[j] - 1)
 
 		x = np.zeros((self.m,d))
@@ -157,7 +154,7 @@ class FANOVA(Base):
 			for i in range(self.k):
 				for j in range(i+1,self.k):
 
-					if (i,j) in self.interactions or (j,i) in self.interactions:
+					if self.interactions:
 						z = self.effect[s,i] * self.mk[j] + self.effect[s,j]
 						x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
 
