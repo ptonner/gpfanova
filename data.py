@@ -135,10 +135,11 @@ def hsalinarum_pq_data():
 
 	return x,y,effect
 
-def hsalinarum_osmo_data():
+def hsalinarum_osmo_data(strain = None):
 	import patsy
 
-	strain = 'hlx2'
+	if strain is None:
+		strain = 'phoU'
 
 	tidy = pd.read_csv("data/hsalinarum/tidy_normalize_all.csv")
 	tidy['Experiment_Well'] = tidy.Experiment + "_" + tidy.Well.astype(str)
@@ -270,6 +271,11 @@ def hsalinarum_beer_data(sample=1):
 	x = x[select]
 	y = y[:,select]
 
+	# select = effect[:,0] != 4
+	# y = y[select,:]
+	# effect = effect[select,:]
+
+	x = (x-x.mean())/x.std()
 	x = x[:,None]
 	y = y.T
 
