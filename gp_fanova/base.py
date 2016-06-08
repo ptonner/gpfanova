@@ -25,6 +25,9 @@ class Base(SamplerContainer):
 		self.x = x # independent variables
 		self.y = y # dependent variables
 
+		# initialize the base index list
+		self._observation_index_base_list = None
+
 		self.n = self.x.shape[0]
 		assert self.y.shape[0] == self.n, 'x and y must have same first dimension shape!'
 		self.p = self.x.shape[1]
@@ -111,7 +114,10 @@ class Base(SamplerContainer):
 		returns:
 			list of strings
 		"""
-		return ['%s'%str(z) for z in self.x]
+		if self._observation_index_base_list is None:
+			self._observation_index_base_list = ['%s'%str(z) for z in self.x]
+
+		return self._observation_index_base_list
 
 	def prior_groups(self):
 		raise NotImplementedError("Implement a prior grouping function for your model!")
@@ -190,10 +196,12 @@ class Base(SamplerContainer):
 		cov = self.kernels[p].K(self.x,sigma,lengthscale)
 		cov += cov.mean()*np.eye(self.n)*1e-6
 
+		rv = scipy.stats.multivariate_normal(mu,cov)
+
 		ll = 1
 		for f in ind:
 			try:
-				ll += scipy.stats.multivariate_normal.logpdf(self.parameter_cache[self.function_index(f)],mu,cov)
+				ll += rv.logpdf(self.parameter_cache[self.function_index(f)])
 			except np.linalg.LinAlgError:
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
