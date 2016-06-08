@@ -108,6 +108,15 @@ class Base(SamplerContainer):
 		"""return the parameter_cache indices for function i"""
 		return ['f%d(%s)'%(i,z) for z in self._observation_index_base()]
 
+	def function_prior(self,f):
+		"""return the prior index for function f."""
+
+		priors = self.prior_groups()
+		for i in range(len(priors)):
+			if f in priors[i]:
+				return i
+		return -1
+
 	def _observation_index_base(self):
 		"""return the base indice structure from the observations.
 
@@ -206,3 +215,19 @@ class Base(SamplerContainer):
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
 		return ll
+
+	def sample_prior(self,):
+
+		# sample the hyperparameters
+
+		## sample the latent functions
+		samples = np.zeros((self.f,self.n))
+		for i in range(self.f):
+			mu = np.zeros(self.n)
+			cov = self.kernels[self.function_prior(i)].K(self.x)
+			samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+		## put into data
+		y = np.dot(self.design_matrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
+
+		return y.T

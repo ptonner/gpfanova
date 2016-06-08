@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy, pyDOE
 import matplotlib.pyplot as plt
+import gp_fanova
 
 
 
@@ -47,8 +48,8 @@ def one_effect_data(effects=3,add_fake_effect=False):
 
 	effect = np.array(e)[:,None]
 
-	m = model.GP_FANOVA(x,y,effect,)
-	m.sample_prior(update_data=True)
+	m = gp_fanova.fanova.FANOVA(x,y,effect,)
+	y = m.sample_prior()
 
 	if add_fake_effect:
 		temp = np.zeros((6,2))
@@ -56,7 +57,7 @@ def one_effect_data(effects=3,add_fake_effect=False):
 		temp[:,1] = np.random.choice(effect,6,replace=False)
 		effect = temp
 
-	return x,m.y,effect
+	return x,y,effect
 
 def two_effect_data():
 	x = np.linspace(-1,1)[:,None]
