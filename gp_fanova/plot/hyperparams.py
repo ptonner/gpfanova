@@ -23,7 +23,7 @@ def _plot_param_correlation(m,param1,param2,logspace=True):
 	if logspace:
 		plt.scatter(m.parameter_history[param1],m.parameter_history[param2])
 	else:
-		plt.scatter(10**m.parameter_history[param1],10**m.parameter_history[param2])
+		plt.scatter(pow(10,m.parameter_history[param1]),pow(10,m.parameter_history[param2]))
 	# plt.title(param,fontsize=20)
 
 def _plot_hyper_params_correlative(m,logspace,*args,**kwargs):
@@ -40,7 +40,7 @@ def _plot_hyper_params_correlative(m,logspace,*args,**kwargs):
 
 		for j in range(i):
 			plt.subplot(s,s,i*s+j+1)
-			_plot_param_correlation(m,params[i],params[j],logspace)
+			_plot_param_correlation(m,params[j],params[i],logspace)
 
 
 def _plot_hyper_params_iterative(m,logspace,*args,**kwargs):
