@@ -4,7 +4,6 @@ import fanova
 import kernel
 import plot
 import sample
-import utils
 import logging
 
 logging.basicConfig()
