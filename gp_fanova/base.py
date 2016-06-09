@@ -68,12 +68,12 @@ class Base(SamplerContainer):
 			w,m = .1,10
 			if 'sigma' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['sigma']
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x: self.prior_likelihood(p=i,sigma=x),w,m))
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p=p,sigma=x),w,m))
 
 			w,m = .1,10
 			if 'lengthscale' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['lengthscale']
-			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x: self.prior_likelihood(p=i,lengthscale=x),w,m))
+			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x),w,m))
 		samplers.extend(self._additional_samplers())
 
 		SamplerContainer.__init__(self,*samplers,**kwargs)
