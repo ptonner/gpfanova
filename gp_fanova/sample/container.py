@@ -9,7 +9,7 @@ class SamplerContainer(object):
 		self.samplers = [a for a in args if issubclass(type(a),Sampler)]
 
 		ind = self.build_index()
-		self.parameter_cache = pd.Series([0]*len(ind),index=ind)
+		self.parameter_cache = pd.Series([0.0]*len(ind),index=ind)
 		self.parameter_history = pd.DataFrame(columns=ind)
 
 	def build_index(self):
