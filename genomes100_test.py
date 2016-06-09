@@ -1,6 +1,10 @@
 
 if __name__ == "__main__":
+
 	import sys, getopt
+	import matplotlib
+	matplotlib.use('Agg')
+
 	import gp_fanova, data
 	import matplotlib.pyplot as plt
 
@@ -24,6 +28,7 @@ if __name__ == "__main__":
 			m.parameter_cache['prior1_lengthscale'] = float(v1)
 
 	m.y = m.sample_prior()
+
 
 	plt.figure(figsize=(20,20))
 	gp_fanova.plot.plot_single_effect(m,0,data=True,_mean=False,offset=False,alpha=1);
