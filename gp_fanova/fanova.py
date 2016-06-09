@@ -1,7 +1,7 @@
 from base import Base
 from sample import Transform
 import numpy as np
-from patsy.contrasts import Sum
+from patsy.contrasts import Helmert
 
 class FANOVA(Base):
 
@@ -66,7 +66,17 @@ class FANOVA(Base):
 		return np.dot(self.effect_contrast_array(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
 
 	def effect_contrast_matrix(self,i):
-		h = Sum().code_without_intercept(range(self.mk[i])).matrix
+		def convert(c):
+			n = c.shape[1]
+			for i in range(n):
+				j = n-i-1
+				c[:,j]/=c[j+1,j]
+				s = np.power(c[j+1,:],2).sum()
+				c[:,j]*=(np.sqrt(1-1./(n+1)-s+np.power(c[j+1,j],2)))
+			return c
+
+		h = Helmert().code_without_intercept(range(self.mk[i])).matrix
+		h = convert(h)
 		return h
 
 	def function_names(self):
