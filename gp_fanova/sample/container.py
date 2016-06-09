@@ -1,6 +1,7 @@
 from . import Sampler
 import pandas as pd
 import time,logging
+import random as pyrandom
 
 class SamplerContainer(object):
 
@@ -41,14 +42,14 @@ class SamplerContainer(object):
 			sample = sampler.sample(*args)
 			self.parameter_cache[sampler.parameters] = sample
 
-	def sample(self,n=1,save=0,verbose=False):
+	def sample(self,n=1,save=0,verbose=False,random=False):
 		logger = logging.getLogger(__name__)
 		start = self.parameter_history.shape[0]
 		i = 1
 
 		start_time = iter_time = time.time()
 		while self.parameter_history.shape[0] - start < n:
-			self._sample()
+			self._sample(random=random)
 
 			if save == 0 or i % save == 0:
 				self.store()
