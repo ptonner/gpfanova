@@ -2,7 +2,7 @@ from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Function
 from kernel import RBF, White
 import numpy as np
-import scipy, logging
+import scipy.stats, logging
 
 class Base(SamplerContainer):
 	"""Base for constructing functional models of the form $y(t) = X \times b(t)$
