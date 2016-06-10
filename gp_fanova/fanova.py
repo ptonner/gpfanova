@@ -167,5 +167,6 @@ class FANOVA(Base):
 					if self.interactions:
 						z = self.effect[s,i] * self.mk[j] + self.effect[s,j]
 						x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
+						ind += (self.mk[i]-1)*(self.mk[j]-1)
 
 		return x
