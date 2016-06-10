@@ -22,6 +22,7 @@ class FANOVA(Base):
 			for j in range(i):
 				if self.interactions:
  					self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
+		self._effect_interaction_index = {} # starting index for each interaction in function matrix
 
 		Base.__init__(self,x,y,*args,**kwargs)
 
@@ -116,16 +117,29 @@ class FANOVA(Base):
 	def effect_interaction_index(self,i,j,k,l):
 		"""index of interaction function in design matrix."""
 		if i > k:
-			return self.effect_contrast_index(k,l,i,j)
+			return self.effect_interaction_index(k,l,i,j)
 
 		if k >= self.k:
 			return self.f
 
+		if j >= self.mk[i]:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.warning("%d is out of range of effect %d with size %d" % (j,i,self.mk[i]))
+			return -1
+		if l >= self.mk[k]:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.warning("%d is out of range of effect %d with size %d" % (l,k,self.mk[k]))
+			return -1
+
+		return self._effect_interaction_index[(i,k)] + j*(self.mk[i]-1) + l
+
 		# mean + effects + interactions before i + interactions with i before k + i interactions before j + l
-		return 1 + sum([m-1 for m in self.mk]) + \
-					sum([[(self.mk[m]-1)*(self.mk[l]-1) for l in range(m,i)] for m in range(i)]) + \
-					sum([(m-1)*(self.mk[i]-1) for m in self.mk[:k]]) + \
-					(j-1)*(self.mk[k]-1) + l
+		# return 1 + sum([m-1 for m in self.mk]) + \
+		# 			sum([[(self.mk[m]-1)*(self.mk[l]-1) for l in range(m,self.k)] for m in range(i)]) + \
+		# 			sum([(m-1)*(self.mk[i]-1) for m in self.mk[:k]]) + \
+		# 			(j-1)*(self.mk[k]-1) + l
 
 	def prior_groups(self):
 		g = [[0]]
@@ -163,10 +177,10 @@ class FANOVA(Base):
 
 			for i in range(self.k):
 				for j in range(i+1,self.k):
-
 					if self.interactions:
 						z = self.effect[s,i] * self.mk[j] + self.effect[s,j]
 						x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
+						self._effect_interaction_index[(i,j)] = ind
 						ind += (self.mk[i]-1)*(self.mk[j]-1)
 
 		return x
