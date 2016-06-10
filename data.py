@@ -59,17 +59,15 @@ def one_effect_data(effects=3,add_fake_effect=False):
 
 	return x,y,effect
 
-def two_effect_data():
+def two_effect_data(e1=2,e2=2):
 	x = np.linspace(-1,1)[:,None]
 	y = np.zeros((50,12))
-	effect = np.array(pyDOE.fullfact([2,2]).tolist()*3).astype(int)
+	effect = np.array(pyDOE.fullfact([e1,e2]).tolist()*3).astype(int)
 
-	cov = np.eye(50)*.1
+	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True)
+	y = m.sample_prior()
 
-	m = model.GP_FANOVA(x,y,effect,)
-	m.sample_prior(update_data=True)
-
-	return x,m.y,effect
+	return x,y,effect
 
 def hsalinarum_data():
 	import patsy
