@@ -19,12 +19,15 @@ def _plot_function(m,i,k,_mean=False,offset=False,burnin=0,labels=None,**kwargs)
 
 	ylim = (1e9,1e-9)
 
+	if m.mk[i]*m.mk[k] > len(colors):
+		_cmap = plt.get_cmap('spectral')
+
 	for j in range(m.mk[i]):
 		for l in range(m.mk[k]):
 			plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
 
 			if m.mk[i]*m.mk[k] <= len(colors):
-				c = colors[j]
+				c = colors[j+l*mk[k]]
 			else:
 				r = .4
 				c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))

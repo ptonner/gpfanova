@@ -56,7 +56,10 @@ class FANOVA(Base):
 		if k is None:
 			ind = range(self.effect_index(i,0),self.effect_index(i+1,0))
 		else:
-			ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i,0,k+1,0))
+			if i == k-1:
+				ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i,0,k+1,0))
+			else:
+				ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i+1,0,k,0))
 		return self.function_matrix(only=ind)
 
 	def effect_sample(self,i,j,k=None,l=None):
