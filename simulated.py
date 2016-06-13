@@ -20,13 +20,13 @@ def model(e,n,interaction,f=False):
 if __name__ == "__main__":
 	import sys, getopt
 
-
 	opts,args = getopt.getopt(sys.argv[1:],'n:s:e:i')
 
-	s = 10
-	n = 3
-	e = (2,2)
-	interaction=False
+	s = 10 # number of samples from posterior
+	n = 3 # number of obesrvations for each condition
+	e = (2,2) # number of effect levels for each effect
+	interaction=False # include interaction?
+
 	for o,a in opts:
 		if o == '-n':
 			n = int(a)
