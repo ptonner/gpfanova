@@ -1,10 +1,16 @@
-import gp_fanova, data
+import gp_fanova, data, pyDOE
 
-def model(e,n,interaction,f=False):
+def model(mk,n,interaction,f=False):
 	import numpy as np
 	np.random.seed(123)
 
-	x,y,effect,f_sample = data.two_effect_data(e[0],e[1],n=n,interactions=interaction)
+	x = np.linspace(-1,1)[:,None]
+	# y = np.zeros((50,(e1+e2)*n))
+	effect = np.array(pyDOE.fullfact(mk).tolist()*n).astype(int)
+	y = np.zeros((50,effect.shape[0]))
+
+	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=interaction)
+	y,f_sample = m.sample_prior()
 
 	if f:
 		st = ""
@@ -38,7 +44,7 @@ if __name__ == "__main__":
 		if o =='-i':
 			interaction=True
 
-	m,_,_,_,_ = model(e,n,interaction,True)
+	m,_,_,_,_ = model(e,n,interaction,False)
 	m.sample(s,1,random=True)
 
 	st = ""
