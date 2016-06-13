@@ -34,6 +34,9 @@ def load(a1,a2):
 
 	data = pd.read_csv(os.path.join(data_dir,'%s-%s.txt'%(a1,a2)),sep="\t",header=None)
 	data = data.iloc[:,:-1]
+	data = np.log2(data)
+	data = data.iloc[4:,:]
+	data = data - data.iloc[0,:]
 
 	x = data.index.values[:,None]
 	y = data.values
