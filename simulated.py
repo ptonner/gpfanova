@@ -39,7 +39,7 @@ if __name__ == "__main__":
 		if o == '-s':
 			s = int(a)
 		if o == '-e':
-			e = split(a)
+			e = a.split(',')
 			e = [int(t) for t in e]
 		if o =='-i':
 			interaction=True
