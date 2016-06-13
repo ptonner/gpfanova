@@ -38,7 +38,7 @@ if __name__ == "__main__":
 		if o =='-i':
 			interaction=True
 
-	m,_,_,_,_ = model(e,n,interaction,True)
+	m,_,_,_,_ = model(e,n,interaction,False)
 	m.sample(s,1,random=True)
 
 	st = ""
