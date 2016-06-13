@@ -1,0 +1,1 @@
+Raw cell growth measurements for all 200 drug-drug interaction assays. Each file contains a 96x64 matrix of numbers which corresponds to OD595 readings for one drug-drug interaction. Rows correspond to different time points with 15 minutes intervals that span 24 hours. Columns correspond to the 8 x 8 matrix of drug concentration combinations.
