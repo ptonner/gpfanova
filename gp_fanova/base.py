@@ -76,7 +76,7 @@ class Base(SamplerContainer):
 			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x),w,m))
 		samplers.extend(self._additional_samplers())
 
-		SamplerContainer.__init__(self,*samplers,**kwargs)
+		SamplerContainer.__init__(self,samplers,**kwargs)
 
 	def _additional_samplers(self):
 		"""Additional samplers for the model, can be overwritten by subclasses."""
@@ -230,4 +230,4 @@ class Base(SamplerContainer):
 		## put into data
 		y = np.dot(self.design_matrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
 
-		return y.T
+		return y.T,samples.T

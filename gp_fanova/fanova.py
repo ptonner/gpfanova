@@ -7,7 +7,7 @@ class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect,effect_transforms=True,interaction_transforms=True,interactions=False,*args,**kwargs):
+	def __init__(self,x,y,effect,interactions=False,effect_transforms=True,interaction_transforms=True,*args,**kwargs):
 		self.effect = effect
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
@@ -16,7 +16,7 @@ class FANOVA(Base):
 		self.interaction_transforms = interaction_transforms
 		self.interactions = interactions
 
-		self.contrasts = [self.effect_contrast_matrix(i) for i in range(self.k)]
+		self.contrasts = [self.buildEffectContrastMatrix(i) for i in range(self.k)]
 		self.contrasts_interaction = {}
 		for i in range(self.k):
 			for j in range(i):
@@ -69,7 +69,31 @@ class FANOVA(Base):
 
 		return np.dot(self.effect_contrast_array(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
 
-	def effect_contrast_matrix(self,i):
+	def effectContrastMatrix(self,i,k=None,full=False):
+		if not full:
+			if k is None:
+				return self.contrasts[i]
+			elif k < i:
+				return self.effectContrastMatrix(k,i,full)
+			else:
+				return self.contrasts_interaction[(i,k)]
+		else:
+			if k is None:
+				a = np.zeros((self.mk[i],self.f))
+				a[:,self.effect_index(i,0):self.effect_index(i+1,0)] = self.contrasts[i]
+				return a
+			elif k < i:
+				return self.effectContrastMatrix(k,i,full)
+			else:
+				a = np.zeros((self.mk[i]*self.mk[k],self.f))
+				if i == k-1:
+					ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i,0,k+1,0))
+				else:
+					ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i+1,0,k,0))
+				a[:,ind] = self.contrasts_interaction[(i,k)]
+				return a
+
+	def buildEffectContrastMatrix(self,i):
 		def convert(c):
 			n = c.shape[1]
 			for i in range(n):

@@ -1,5 +1,5 @@
-import random
-random.seed(123)
+# import random
+# random.seed(123)
 
 import numpy as np
 import pandas as pd
@@ -59,15 +59,16 @@ def one_effect_data(effects=3,add_fake_effect=False):
 
 	return x,y,effect
 
-def two_effect_data(e1=2,e2=2):
+def two_effect_data(e1=2,e2=2,n=3,**kwargs):
 	x = np.linspace(-1,1)[:,None]
-	y = np.zeros((50,12))
-	effect = np.array(pyDOE.fullfact([e1,e2]).tolist()*3).astype(int)
+	# y = np.zeros((50,(e1+e2)*n))
+	effect = np.array(pyDOE.fullfact([e1,e2]).tolist()*n).astype(int)
+	y = np.zeros((50,effect.shape[0]))
 
-	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True)
-	y = m.sample_prior()
+	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
+	y,f_samples = m.sample_prior()
 
-	return x,y,effect
+	return x,y,effect,f_samples
 
 def hsalinarum_data():
 	import patsy

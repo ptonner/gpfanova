@@ -5,12 +5,14 @@ import random as pyrandom
 
 class SamplerContainer(object):
 
-	def __init__(self,*args):
-		self.samplers = [a for a in args if issubclass(type(a),Sampler)]
+	def __init__(self,samplers,parameter_file=None,*args,**kwargs):
+		self.samplers = [a for a in samplers if issubclass(type(a),Sampler)]
 
 		ind = self.build_index()
 		self.parameter_cache = pd.Series([0.0]*len(ind),index=ind)
 		self.parameter_history = pd.DataFrame(columns=ind)
+
+		self.load(parameter_file)
 
 	def build_index(self):
 		ind = []
@@ -21,6 +23,7 @@ class SamplerContainer(object):
 
 	def _sample(self,random=False):
 
+		logger = logging.getLogger(__name__)
 		ind = range(len(self.samplers))
 
 		if random:
@@ -28,6 +31,8 @@ class SamplerContainer(object):
 
 		for i in ind:
 			sampler = self.samplers[i]
+
+			logger.debug('sampling %s'%str(sampler))
 
 			args = []
 			if sampler.current_param_dependent:
@@ -66,6 +71,14 @@ class SamplerContainer(object):
 	def store(self):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
+
+	def save(self,f):
+		self.parameter_history.to_csv(f,index=False)
+
+	def load(self,f):
+		if f is None:
+			return
+		self.parameter_history = pd.read_csv(f,index_col=None)
 
 	def __repr__(self):
 		s = "\n".join(['SamplerContainer:']+[str(samp) for samp in self.samplers])

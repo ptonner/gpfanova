@@ -9,7 +9,7 @@ def plotInteraction(m,i,k,function=False,data=False,derivative=False,**kwargs):
 	if derivative:
 		_plot_derivative(m,i,k,**kwargs)
 
-def _plot_function(m,i,k,_mean=False,offset=False,burnin=0,labels=None,**kwargs):
+def _plot_function(m,i,k,_mean=False,offset=False,burnin=0,subplots=True,labels=None,**kwargs):
 
 	if m.mk[k] > len(colors):
 		_cmap = plt.get_cmap('spectral')
@@ -24,10 +24,12 @@ def _plot_function(m,i,k,_mean=False,offset=False,burnin=0,labels=None,**kwargs)
 
 	for j in range(m.mk[i]):
 		for l in range(m.mk[k]):
-			plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
+
+			if subplots:
+				plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
 
 			if m.mk[i]*m.mk[k] <= len(colors):
-				c = colors[j+l*mk[k]]
+				c = colors[j+l*m.mk[i]]
 			else:
 				r = .4
 				c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
@@ -58,7 +60,8 @@ def _plot_function(m,i,k,_mean=False,offset=False,burnin=0,labels=None,**kwargs)
 		if not labels is None:
 			plt.legend(loc="best")
 
-	for j in range(m.mk[i]):
-		for l in range(m.mk[k]):
-			plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
-			plt.ylim(ylim)
+	if subplots:
+		for j in range(m.mk[i]):
+			for l in range(m.mk[k]):
+				plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
+				plt.ylim(ylim)
