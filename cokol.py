@@ -34,7 +34,7 @@ def load(a1,a2):
 
 	data = pd.read_csv(os.path.join(data_dir,'%s-%s.txt'%(a1,a2)),sep="\t",header=None)
 	data = data.iloc[:,:-1]
-	
+
 	x = data.index.values[:,None]
 	y = data.values
 
@@ -79,8 +79,15 @@ if __name__ == "__main__":
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
 		x,y,effect,_ = load(a1,a2)
 		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions)
-		m.sample(args.n_samples,1)
+
 		s = ''
 		if args.interactions:
 			s = '_interactions'
+
+		try:
+			m.sample(args.n_samples,1)
+		except Exception,e:
+			m.save('results/cokol/%s-%s%s.csv'%(a1,a2,s))
+			raise(e)
+
 		m.save('results/cokol/%s-%s%s.csv'%(a1,a2,s))
