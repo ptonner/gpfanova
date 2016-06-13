@@ -104,7 +104,7 @@ class FANOVA(Base):
 			return c
 
 		h = Helmert().code_without_intercept(range(self.mk[i])).matrix
-		h = convert(h)
+		# h = convert(h)
 		return h
 
 	def function_names(self):
