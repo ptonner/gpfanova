@@ -4,7 +4,7 @@ import pandas as pd
 data_dir = "data/cokol_et_al_2011/"
 data_files = os.listdir(data_dir)
 data_files.remove("README.txt")
-data_files.remove(".DS_Store")
+# data_files.remove(".DS_Store")
 
 def fileNameParse(df):
 	import re
@@ -27,17 +27,20 @@ def hasSelfDataset(a):
 	return '%s-%s.txt' % (a,a) in data_files
 
 def column_concentrations(ind):
-    return 1.*ind/64,1.*ind%8/8
+    return 1./8*(ind/8),1.*ind%8/8
 
 def load(a1,a2):
+	import numpy as np
 
 	data = pd.read_csv(os.path.join(data_dir,'%s-%s.txt'%(a1,a2)),sep="\t",header=None)
-	x = data.index.values
+	data = data.iloc[:,:-1]
+	
+	x = data.index.values[:,None]
 	y = data.values
 
 	concs = [column_concentrations(i) for i in data.columns]
 	concs = pd.DataFrame(concs)
-	effect = [concs[0].factorize()[0],concs[0].factorize()[1]]
+	effect = np.array([concs[0].factorize()[0],concs[1].factorize()[0]]).T
 	labels = [concs[0].tolist(),concs[1].tolist()]
 
 	return x,y,effect,labels
@@ -56,7 +59,7 @@ def generate_commands(n=10,interactions=False):
 	return ret
 
 if __name__ == "__main__":
-	import argparse
+	import argparse, gp_fanova
 
 	parser = argparse.ArgumentParser(description='Run analysis of Cokol et al. data.')
 	parser.add_argument('antibiotics',metavar=('A'), type=str, nargs='*',
@@ -73,4 +76,11 @@ if __name__ == "__main__":
 	if args.generateCommands:
 		print '\n'.join(generate_commands(args.n_samples,args.interactions))
 	else:
-		print args
+		a1,a2 = args.antibiotics[0],args.antibiotics[1]
+		x,y,effect,_ = load(a1,a2)
+		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions)
+		m.sample(args.n_samples,1)
+		s = ''
+		if args.interactions:
+			s = '_interactions'
+		m.save('results/cokol/%s-%s%s.csv'%(a1,a2,s))
