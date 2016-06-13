@@ -3,6 +3,7 @@ from sample import Transform
 import numpy as np
 from patsy.contrasts import Helmert
 
+
 class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
