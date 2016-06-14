@@ -29,17 +29,27 @@ def hasSelfDataset(a):
 def column_concentrations(ind):
     return 1./8*(ind/8),1.*ind%8/8
 
-def load(a1,a2):
+def load(a1,a2,t0=0):
 	import numpy as np
 
 	data = pd.read_csv(os.path.join(data_dir,'%s-%s.txt'%(a1,a2)),sep="\t",header=None)
 	data = data.iloc[:,:-1]
+
+	select = data.index > t0
+	data = data.loc[select,:]
+
 	data = np.log2(data)
-	data = data.iloc[4:,:]
+	# data = data.iloc[4:,:]
 	data = data - data.iloc[0,:]
 
 	x = data.index.values[:,None]
+	x = (x.astype(float)-x.min())/x.max()
+	
 	y = data.values
+
+	# select = x[:,0]>t0
+	# x = x[select,:]
+	# y = y[select,:]
 
 	concs = [column_concentrations(i) for i in data.columns]
 	concs = pd.DataFrame(concs)
@@ -47,6 +57,13 @@ def load(a1,a2):
 	labels = [concs[0].tolist(),concs[1].tolist()]
 
 	return x,y,effect,labels
+
+def loadModel(a1,a2):
+	import gp_fanova
+
+	x,y,effect,labels = load(a1,a2)
+	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2))
+	return m,x,y,effect,labels
 
 def generate_commands(n=10,interactions=False):
 
