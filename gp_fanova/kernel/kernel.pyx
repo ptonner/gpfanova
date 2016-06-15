@@ -2,6 +2,7 @@
 
 import numpy as np
 import logging
+from .. import linalg
 
 OFFSET = 1e-9
 
@@ -45,7 +46,8 @@ class Kernel(object):
 		params = self.build_params(*args,**kwargs)
 		K = self._K(X,*params) + np.eye(X.shape[0])*OFFSET
 		try:
-			chol = np.linalg.cholesky(K)
+			# chol = np.linalg.cholesky(K)
+			chol = linalg.jitchol(K)
 			chol_inv = np.linalg.inv(chol)
 		except np.linalg.linalg.LinAlgError,e:
 			logger = logging.getLogger(__name__)
