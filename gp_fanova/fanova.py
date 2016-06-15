@@ -133,6 +133,10 @@ class FANOVA(Base):
 		if contrast:
 			s = '*'
 
+		if not i is None:
+			if k > i:
+				return self.effect_index_to_cache(i,j,k,l,contrast)
+
 		if i is None:
 			return ["%s%s_%d(%s)" % (FANOVA.EFFECT_SUFFIXES[k],s,l,z) for z in self._observation_index_base()]
 
