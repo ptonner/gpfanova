@@ -1,5 +1,5 @@
-from single_effect import plot_single_effect
+from single_effect import plotSingleEffect
 from twoeffect import plotTwoEffect
 from interaction import plotInteraction
-from hyperparams import plot_hyper_params
+from hyperparams import plotHyperparameters
 from function import plot_function, plot_functions

@@ -1,6 +1,6 @@
 from meta import *
 
-def plot_single_effect(m,k,function=False,data=False,derivative=False,**kwargs):
+def plotSingleEffect(m,k,function=False,data=False,derivative=False,**kwargs):
 
 	if function:
 		if type(function) == tuple and len(function)==3:
