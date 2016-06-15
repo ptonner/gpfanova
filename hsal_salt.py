@@ -29,7 +29,7 @@ if __name__ == "__main__":
 		if o == '-f':
 			f = True
 
-	m,_,_,_ = get(interaction,f)
+	m,_,_,_,_ = get(interaction,f)
 
 	s = ""
 	if interaction:
