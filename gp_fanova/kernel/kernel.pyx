@@ -1,6 +1,7 @@
 # cython: profile=True
 
 import numpy as np
+import logging
 
 OFFSET = 1e-9
 
@@ -43,8 +44,13 @@ class Kernel(object):
 	def K_inv(self,X,*args,**kwargs):
 		params = self.build_params(*args,**kwargs)
 		K = self._K(X,*params) + np.eye(X.shape[0])*OFFSET
-		chol = np.linalg.cholesky(K)
-		chol_inv = np.linalg.inv(chol)
+		try:
+			chol = np.linalg.cholesky(K)
+			chol_inv = np.linalg.inv(chol)
+		except np.linalg.linalg.LinAlgError,e:
+			logger = logging.getLogger(__name__)
+			logger.error('Kernel inversion error: %s'%str(self.parameters))
+			raise(e)
 		inv = np.dot(chol_inv.T,chol_inv)
 
 		return inv
