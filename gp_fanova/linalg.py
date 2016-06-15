@@ -1,4 +1,6 @@
 """
+This code was adapted from the GPy library.
+
 Copyright (c) 2012, the GPy authors
 All rights reserved.
 
