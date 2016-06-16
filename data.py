@@ -37,10 +37,10 @@ import gp_fanova
 # 		y[:,k:nextk]
 
 
-def one_effect_data(effects=3,add_fake_effect=False):
+def one_effect_data(effects=3,n=50,add_fake_effect=False):
 	samples = 2
-	x = np.linspace(-1,1)[:,None]
-	y = np.zeros((50,effects*samples))
+	x = np.linspace(-1,1,n)[:,None]
+	y = np.zeros((n,effects*samples))
 	# effect = np.array([0]*3+[1]*3)
 	e = []
 	for i in range(effects):
