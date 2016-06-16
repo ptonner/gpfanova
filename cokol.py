@@ -97,7 +97,7 @@ if __name__ == "__main__":
 		print '\n'.join(generate_commands(args.n_samples,args.interactions))
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
-		x,y,effect,_ = load(a1,a2)
+		x,y,effect,_ = load(a1,a2,t0=6)
 		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions)
 
 		s = ''
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 			s = '_interactions'
 
 		try:
-			m.sample(args.n_samples,1)
+			m.sample(args.n_samples,10)
 		except Exception,e:
 			m.save('results/cokol/%s-%s%s.csv'%(a1,a2,s))
 			raise(e)
