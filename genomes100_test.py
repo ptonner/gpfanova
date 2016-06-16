@@ -11,7 +11,7 @@ if __name__ == "__main__":
 	opts,args = getopt.getopt(sys.argv[1:],'n:v:l:')
 
 	x,y,effect = data.one_effect_data(100)
-	m = gp_fanova.fanova.FANOVA(x,y,effect)
+	m = gp_fanova.fanova.FANOVA(x,y,effect,helmert_convert=True)
 	m.parameter_cache['y_sigma'] = -1
 
 	n = 1
