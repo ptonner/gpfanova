@@ -49,7 +49,7 @@ def one_effect_data(effects=3,add_fake_effect=False):
 	effect = np.array(e)[:,None]
 
 	m = gp_fanova.fanova.FANOVA(x,y,effect,)
-	y = m.sample_prior()
+	y,_ = m.sample_prior()
 
 	if add_fake_effect:
 		temp = np.zeros((6,2))
