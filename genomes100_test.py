@@ -11,12 +11,14 @@ if __name__ == "__main__":
 
 	opts,args = getopt.getopt(sys.argv[1:],'n:v:l:')
 
-	x,y,effect,_ = data.multiple_effects([3]*5,100,20,False,seed=True)
+	p = 20
+
+	x,y,effect,_ = data.multiple_effects([3]*p,100,20,False,seed=True)
 	m = gp_fanova.fanova.FANOVA(x,y,effect,helmert_convert=True)
-	m.parameter_cache['y_sigma'] = -1
-	m.parameter_cache['prior0_lengthscale'] = -1
-	for i in range(5):
-		m.parameter_cache['prior%d_lengthscale'%(i+1)] = np.random.uniform(-3,.5)
+	m.parameter_cache['y_sigma'] = -2
+	m.parameter_cache['prior0_lengthscale'] = -3
+	for i in range(p):
+		m.parameter_cache['prior%d_lengthscale'%(i+1)] = np.random.uniform(-3,0)
 
 	n = 1
 	for o,a in opts:
@@ -33,12 +35,12 @@ if __name__ == "__main__":
 
 	m.y,_ = m.sample_prior()
 
-	for i in range(5):
+	for i in range(p):
 		# plt.figure(figsize=(20,20))
-		gp_fanova.plot.plotSingleEffect(m,i,data=True,_mean=False,offset=False,alpha=1);
-		plt.savefig("results/genomes100_data_%d.png"%i,bbox_inches="tight",dpi=300)
+		gp_fanova.plot.plotSingleEffect(m,i,data=True,_mean=False,offset=False,alpha=.81,empirical=False,individual=True);
+		plt.savefig("results/genomes100/data_%d.png"%i,bbox_inches="tight",dpi=300)
 		plt.close()
 
-	m.sample(n,10,random=True)
+	# m.sample(n,10,random=True)
 
-	m.parameter_history.to_csv("results/genomes100_%d.csv"%n,index=False)
+	# m.parameter_history.to_csv("results/genomes100/parameters_%d_%d.csv"%(n,p),index=False)
