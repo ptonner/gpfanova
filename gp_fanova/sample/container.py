@@ -47,23 +47,25 @@ class SamplerContainer(object):
 			sample = sampler.sample(*args)
 			self.parameter_cache[sampler.parameters] = sample
 
-	def sample(self,n=1,save=0,verbose=False,random=False):
+	def sample(self,n=1,thin=0,verbose=False,random=False):
 		logger = logging.getLogger(__name__)
 		start = self.parameter_history.shape[0]
 		i = 1
 
 		start_time = iter_time = time.time()
-		while self.parameter_history.shape[0] - start < n:
+		# while self.parameter_history.shape[0] - start < n:
+		for i in range(n):
 			self._sample(random=random)
 
-			if save == 0 or i % save == 0:
+			# add one so the first save is on the 'thin'th iteration, not the first
+			if thin == 0 or (i+1) % thin == 0:
 				self.store()
 
 				j = self.parameter_history.shape[0] - start
 				logger.debug("%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60))
 				iter_time = time.time()
 
-			i+=1
+			# i+=1
 
 		if verbose:
 			logger.info("%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60))
