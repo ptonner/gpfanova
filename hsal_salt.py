@@ -36,7 +36,7 @@ if __name__ == "__main__":
 		s = "interaction_"
 
 	try:
-		m.sample(n,1,random=True)
+		m.sample(n,10,random=True)
 	except Exception,e:
 		m.save("results/hsal_beer_%s%d.csv"%(s,n))
 		raise(e)

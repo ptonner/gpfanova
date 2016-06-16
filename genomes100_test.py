@@ -34,6 +34,6 @@ if __name__ == "__main__":
 	gp_fanova.plot.plot_single_effect(m,0,data=True,_mean=False,offset=False,alpha=1);
 	plt.savefig("results/genomes100_data.png",bbox_inches="tight",dpi=300)
 
-	m.sample(n,1,random=True)
+	m.sample(n,10,random=True)
 
 	m.parameter_history.to_csv("results/genomes100_%d.csv"%n,index=False)
