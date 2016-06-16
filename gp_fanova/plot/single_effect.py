@@ -123,17 +123,31 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=1,**kwargs):
 	if m.mk[k] > len(colors):
 		_cmap = plt.get_cmap('spectral')
 
-	for i in range(m.y.shape[1]):
+	for j in range(m.mk[k]):
 
-		if subplots:
-			plt.subplot(subplots[0],subplots[1],m.effect[i,k]+1)
-
-		j = m.effect[i,k]
 		if m.mk[k] <= len(colors):
 			c = colors[j]
 		else:
 			r = .4
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
 
-		plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
-		plt.ylim(m.y.min(),m.y.max())
+		samples = m.y[:,m.effect[:,k]==j]
+		mean = samples.mean(1)
+		std = samples.std(1)
+		plt.plot(m.x,mean,color=c)
+		plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
+
+	# for i in range(m.y.shape[1]):
+	#
+	# 	if subplots:
+	# 		plt.subplot(subplots[0],subplots[1],m.effect[i,k]+1)
+	#
+	# 	j = m.effect[i,k]
+	# 	if m.mk[k] <= len(colors):
+	# 		c = colors[j]
+	# 	else:
+	# 		r = .4
+	# 		c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
+	#
+		# plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
+	plt.ylim(m.y.min(),m.y.max())
