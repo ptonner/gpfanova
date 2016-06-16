@@ -31,13 +31,19 @@ class FANOVA(Base):
 	def has_interaction(self,i,k):
 		return self.interactions
 
+	def effect_suffix(self,k):
+		if self.k <= len(FANOVA.EFFECT_SUFFIXES):
+			return FANOVA.EFFECT_SUFFIXES[k]
+		else:
+			return 'effect%d'%k
+
 	def _additional_samplers(self):
 		ret = []
 
 		for k in range(self.k):
 			if self.effect_transforms:
 				for l in range(self.mk[k]):
-					ret.append(Transform('%s_%d'%(FANOVA.EFFECT_SUFFIXES[k],l),
+					ret.append(Transform('%s_%d'%(self.effect_suffix(k),l),
 											self.effect_index_to_cache(k,l),
 											lambda k=k,l=l : self.effect_sample(k,l)))
 
@@ -47,7 +53,7 @@ class FANOVA(Base):
 					if self.has_interaction(i,k):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
-								ret.append(Transform('(%s,%s)_(%d,%d)'%(FANOVA.EFFECT_SUFFIXES[k],FANOVA.EFFECT_SUFFIXES[i],l,j),
+								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effect_suffix(k),self.effect_suffix(i),l,j),
 												self.effect_index_to_cache(k,l,i,j),
 												lambda k=k,l=l,i=i,j=j : self.effect_sample(k,l,i,j)))
 
@@ -117,14 +123,14 @@ class FANOVA(Base):
 		ind = 1
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
-				fxn_names[ind] = "%s*_%d" % (FANOVA.EFFECT_SUFFIXES[i],j)
+				fxn_names[ind] = "%s*_%d" % (self.effect_suffix(i),j)
 				ind += 1
 
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
 				for k in range(i+1,self.k):
 					for l in range(self.mk[k]-1):
-						fxn_names[ind] = "(%s,%s)*_(%d,%d)" % (FANOVA.EFFECT_SUFFIXES[i],FANOVA.EFFECT_SUFFIXES[k],j,l)
+						fxn_names[ind] = "(%s,%s)*_(%d,%d)" % (self.effect_suffix(i),self.effect_suffix(k),j,l)
 						ind += 1
 
 		return fxn_names
@@ -141,9 +147,9 @@ class FANOVA(Base):
 				return self.effect_index_to_cache(i,j,k,l,contrast)
 
 		if i is None:
-			return ["%s%s_%d(%s)" % (FANOVA.EFFECT_SUFFIXES[k],s,l,z) for z in self._observation_index_base()]
+			return ["%s%s_%d(%s)" % (self.effect_suffix(k),s,l,z) for z in self._observation_index_base()]
 
-		return ["(%s,%s)%s_(%d,%d)(%s)" % (FANOVA.EFFECT_SUFFIXES[k],FANOVA.EFFECT_SUFFIXES[i],s,l,j,z) for z in self._observation_index_base()]
+		return ["(%s,%s)%s_(%d,%d)(%s)" % (self.effect_suffix(k),self.effect_suffix(i),s,l,j,z) for z in self._observation_index_base()]
 
 	def effect_index(self,i,j):
 		"""index of effect function in design matrix."""
