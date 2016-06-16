@@ -70,6 +70,24 @@ def two_effect_data(e1=2,e2=2,n=3,**kwargs):
 
 	return x,y,effect,f_samples
 
+def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwargs):
+	x = np.linspace(-1,1,n)[:,None]
+	# y = np.zeros((50,(e1+e2)*n))
+
+	if seed:
+		np.random.seed(123)
+
+	if fullFactorial:
+		effect = np.array(pyDOE.fullfact(effects).tolist()*m).astype(int)
+	else:
+		effect = np.array([[np.random.choice(range(e)) for e in effects] for i in range(m)])
+	y = np.zeros((n,effect.shape[0]))
+
+	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
+	y,f_samples = m.sample_prior()
+
+	return x,y,effect,f_samples
+
 def hsalinarum_data():
 	import patsy
 
