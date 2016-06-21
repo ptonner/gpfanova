@@ -56,7 +56,8 @@ def load(a1,a2,t0=0,step=1):
 	effect = np.array([concs[0].factorize()[0],concs[1].factorize()[0]]).T
 	labels = [concs[0].tolist(),concs[1].tolist()]
 
-	select = np.arange(0,effect.shape[0],step)#np.all(effect % 2 == 0,1)
+	select = np.arange(0,effect.shape[0],step)
+	select = np.all(effect % 2 == 0,1)
 	y = y[:,select]
 	effect = effect[select,:]
 	effect = effect/step
