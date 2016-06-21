@@ -62,7 +62,7 @@ def loadModel(a1,a2):
 	import gp_fanova
 
 	x,y,effect,labels = load(a1,a2)
-	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2))
+	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
 	return m,x,y,effect,labels
 
 def generate_commands(n=10,interactions=False):
@@ -98,7 +98,7 @@ if __name__ == "__main__":
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
 		x,y,effect,_ = load(a1,a2,t0=6)
-		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions)
+		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_covert=True)
 
 		s = ''
 		if args.interactions:
