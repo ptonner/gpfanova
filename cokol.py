@@ -44,7 +44,7 @@ def load(a1,a2,t0=0):
 
 	x = data.index.values[:,None]
 	x = (x.astype(float)-x.min())/x.max()
-	
+
 	y = data.values
 
 	# select = x[:,0]>t0
@@ -55,6 +55,10 @@ def load(a1,a2,t0=0):
 	concs = pd.DataFrame(concs)
 	effect = np.array([concs[0].factorize()[0],concs[1].factorize()[0]]).T
 	labels = [concs[0].tolist(),concs[1].tolist()]
+
+	select = np.all(effect % 2 == 0,1)
+	y = y[:,select]
+	effect = effect[select,:]
 
 	return x,y,effect,labels
 
