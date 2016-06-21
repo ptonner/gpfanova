@@ -29,7 +29,7 @@ def hasSelfDataset(a):
 def column_concentrations(ind):
     return 1./8*(ind/8),1.*ind%8/8
 
-def load(a1,a2,t0=0):
+def load(a1,a2,t0=0,step=1):
 	import numpy as np
 
 	data = pd.read_csv(os.path.join(data_dir,'%s-%s.txt'%(a1,a2)),sep="\t",header=None)
@@ -56,16 +56,17 @@ def load(a1,a2,t0=0):
 	effect = np.array([concs[0].factorize()[0],concs[1].factorize()[0]]).T
 	labels = [concs[0].tolist(),concs[1].tolist()]
 
-	select = np.all(effect % 2 == 0,1)
+	select = np.arange(0,effect.shape[0],step)#np.all(effect % 2 == 0,1)
 	y = y[:,select]
 	effect = effect[select,:]
+	effect = effect/step
 
 	return x,y,effect,labels
 
-def loadModel(a1,a2):
+def loadModel(a1,a2,**kwargs):
 	import gp_fanova
 
-	x,y,effect,labels = load(a1,a2)
+	x,y,effect,labels = load(a1,a2,**kwargs)
 	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
 	return m,x,y,effect,labels
 
@@ -101,7 +102,7 @@ if __name__ == "__main__":
 		print '\n'.join(generate_commands(args.n_samples,args.interactions))
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
-		x,y,effect,_ = load(a1,a2,t0=6)
+		x,y,effect,_ = load(a1,a2,t0=6,step=2)
 		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_covert=True)
 
 		s = ''
