@@ -1,5 +1,5 @@
 from patsy.contrasts import Sum
-from sample import SamplerContainer, Gibbs, Slice, Fixed, Function
+from sample import SamplerContainer, Gibbs, Slice, Fixed, Function, FunctionDerivative
 from kernel import RBF, White
 import numpy as np
 import scipy.stats, logging
@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,hyperparam_kwargs={},*args,**kwargs):
+	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,*args,**kwargs):
 		""" Construct the base functional model.
 
 		Args:
@@ -65,6 +65,9 @@ class Base(SamplerContainer):
 					s = "f%d"%f
 				samplers.append(Function('%s'%s,self.function_index(f),self,f,self.kernels[-1]))
 
+				if derivatives:
+					samplers.append(FunctionDerivative('d%s'%s,self.function_index(f,derivative=True),self,f,self.kernels[-1]))
+
 			w,m = .1,10
 			if 'sigma' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['sigma']
@@ -104,8 +107,10 @@ class Base(SamplerContainer):
 		"""
 		raise NotImplementedError("Implement a design matrix for your model!")
 
-	def function_index(self,i):
+	def function_index(self,i,derivative=False,*args,**kwargs):
 		"""return the parameter_cache indices for function i"""
+		if derivative:
+			return ['df%d(%s)'%(i,z) for z in self._observation_index_base()]
 		return ['f%d(%s)'%(i,z) for z in self._observation_index_base()]
 
 	def function_prior(self,f):
@@ -139,20 +144,20 @@ class Base(SamplerContainer):
 
 		return ['prior%d_sigma'%i,'prior%d_lengthscale'%i]
 
-	def function_matrix(self,remove=[],only=[]):
+	def function_matrix(self,remove=[],only=[],derivative=False):
 		"""return the current function values, stored in the parameter_cache."""
 
 		functions = []
 
 		if len(only) > 0:
 			for o in only:
-				functions.append(self.function_index(o))
+				functions.append(self.function_index(o,derivative=derivative))
 		else:
 			for f in range(self.f):
 				if f in remove:
 					functions.append(None)
 				else:
-					functions.append(self.function_index(f))
+					functions.append(self.function_index(f,derivative=derivative))
 
 		f = np.zeros((self.n,len(functions)))
 
@@ -163,6 +168,10 @@ class Base(SamplerContainer):
 				f[:,i] = self.parameter_cache[z]
 
 		return f
+
+	def functionSamples(self,f,*args,**kwargs):
+		"""return the samples of function f from the parameter history."""
+		return self.parameter_history[self.function_index(f,*args,**kwargs)]
 
 	def residual(self,remove=[],only=[]):
 		return self.y.T - np.dot(self.design_matrix,self.function_matrix(remove,only).T)

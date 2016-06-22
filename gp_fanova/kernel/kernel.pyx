@@ -39,8 +39,14 @@ class Kernel(object):
 		return params
 
 	def K(self,X,*args,**kwargs):
+		"""Compute the covariance matrix for the input X with alternative values of hyperparameters provided through args and kwargs, if necessary."""
 		params = self.build_params(*args,**kwargs)
 		return self._K(X,*params)
+
+	def dK(self,X,cross=False,*args,**kwargs):
+		"""Compute the derivative of the covariance matrix for the input X with alternative values of hyperparameters provided through args and kwargs, if necessary."""
+		params = self.build_params(*args,**kwargs)
+		return self._dK(X,cross,*params)
 
 	def K_inv(self,X,*args,**kwargs):
 		params = self.build_params(*args,**kwargs)
@@ -60,5 +66,5 @@ class Kernel(object):
 	def _K(self,X,*args):
 		raise NotImplemented()
 
-	def _dK(self,X):
+	def _dK(self,X,cross,*args):
 		raise NotImplemented()
