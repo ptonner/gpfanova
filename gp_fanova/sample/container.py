@@ -7,10 +7,15 @@ class SamplerContainer(object):
 
 	def __init__(self,samplers,parameter_file=None,*args,**kwargs):
 		self.samplers = [a for a in samplers if issubclass(type(a),Sampler)]
+		self.sampler_dict = {a.name:a for a in self.samplers}
 
 		ind = self.build_index()
 		self.parameter_cache = pd.Series([0.0]*len(ind),index=ind)
 		self.parameter_history = pd.DataFrame(columns=ind)
+
+		for k,v in kwargs.iteritems():
+			if k in self.sampler_dict:
+				self.parameter_cache[self.sampler_dict[k].parameters] = v
 
 		self.load(parameter_file)
 
