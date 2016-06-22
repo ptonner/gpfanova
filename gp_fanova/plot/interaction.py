@@ -9,7 +9,7 @@ def plotInteraction(m,i,k,kv=None,function=False,data=False,derivative=False,**k
 	if derivative:
 		_plot_derivative(m,i,k,kv,**kwargs)
 
-def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,labels=None,origin=False,**kwargs):
+def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,**kwargs):
 
 	ncol = m.mk[i]
 	nrow = m.mk[k]
@@ -58,6 +58,8 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,labels=None,origi
 				c = _cmap(r+(1-r)*(j+1)/(m.mk[i]+1))
 
 			samples = m.parameter_history[m.effect_index_to_cache(i,j,k,kv)].values[burnin:,:]
+			if offset:
+				samples += m.parameter_history[m.effect_index_to_cache(i,j)].values[burnin:,:]
 
 			mean = samples.mean(0)
 			std = samples.std(0)
