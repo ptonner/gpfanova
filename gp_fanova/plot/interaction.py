@@ -39,6 +39,9 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 
 				# samples = m.effect_samples(k,j)[burnin:,:]
 				samples = m.parameter_history[m.effect_index_to_cache(i,j,k,l)].values[burnin:,:]
+				if offset:
+					samples += m.parameter_history[m.effect_index_to_cache(i,j)].values[burnin:,:]
+					samples += m.parameter_history[m.effect_index_to_cache(k,l)].values[burnin:,:]
 
 				mean = samples.mean(0)
 				std = samples.std(0)
