@@ -37,8 +37,8 @@ import gp_fanova
 # 		y[:,k:nextk]
 
 
-def one_effect_data(effects=3,n=50,add_fake_effect=False):
-	samples = 2
+def one_effect_data(effects=3,n=50,r=2,add_fake_effect=False):
+	samples = r
 	x = np.linspace(-1,1,n)[:,None]
 	y = np.zeros((n,effects*samples))
 	# effect = np.array([0]*3+[1]*3)
@@ -48,8 +48,9 @@ def one_effect_data(effects=3,n=50,add_fake_effect=False):
 
 	effect = np.array(e)[:,None]
 
-	m = gp_fanova.fanova.FANOVA(x,y,effect,)
+	m = gp_fanova.fanova.FANOVA(x,y,effect,helmert_covert=True)
 	y,_ = m.sample_prior()
+	# y,_ = m.sample_prior()
 
 	if add_fake_effect:
 		temp = np.zeros((6,2))
