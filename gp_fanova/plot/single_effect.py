@@ -118,7 +118,7 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 	if not labels is None:
 		plt.legend(loc="best")
 
-def _plot_single_effect_data(m,k,subplots=False,alpha=1,empirical=True,individual=False,**kwargs):
+def _plot_single_effect_data(m,k,subplots=False,alpha=1,empirical=True,individual=False,interval=.9,**kwargs):
 
 	if m.mk[k] > len(colors):
 		_cmap = plt.get_cmap('spectral')
@@ -133,10 +133,18 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=1,empirical=True,individua
 				c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
 
 			samples = m.y[:,m.effect[:,k]==j]
+
+			# sort each row
+			samples.sort(1)
 			mean = samples.mean(1)
-			std = samples.std(1)
+
+			thresh = (1.-interval)/2
+			li = int(thresh*samples.shape[1])
+			ui = int((thresh+interval)*samples.shape[1])
+
+			# std = samples.std(1)
 			plt.plot(m.x,mean,color=c)
-			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
+			plt.fill_between(m.x[:,0],samples[:,li],samples[:,ui],alpha=.2,color=c)
 	elif individual:
 		for i in range(m.y.shape[1]):
 
