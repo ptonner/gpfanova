@@ -20,10 +20,12 @@ class FANOVA(Base):
 
 		self.contrasts = [self.buildEffectContrastMatrix(i) for i in range(self.k)]
 		self.contrasts_interaction = {}
+		self.projectionMatrices = {i:self._projectionMatrix(i) for i in range(self.k)}
 		for i in range(self.k):
 			for j in range(i):
 				if self.interactions:
  					self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
+					self.projectionMatrices[(j,i)] = self._projectionMatrix(j,i)
 		self._effect_interaction_index = {} # starting index for each interaction in function matrix
 
 		Base.__init__(self,x,y,*args,**kwargs)
@@ -46,6 +48,9 @@ class FANOVA(Base):
 					ret.append(Transform('%s_%d'%(self.effect_suffix(k),l),
 											self.effect_index_to_cache(k,l),
 											lambda k=k,l=l : self.effect_sample(k,l)))
+				ret.append(Transform("%s_finiteSampleVariance"%self.effect_suffix(k),
+											self.fsvIndexToCache(k),
+											lambda k=k:self.finitePopulationVarianceSample(k)))
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
@@ -70,12 +75,33 @@ class FANOVA(Base):
 				ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i+1,0,k,0))
 		return self.function_matrix(only=ind)
 
+	def effectArray(self,i,k=None):
+		"""Get an array of effects from the parameter cache."""
+
+		if k is None:
+			a = np.zeros((self.n,self.mk[i]))
+			for j in range(self.mk[i]):
+				a[:,j] = self.parameterCurrent("%s_%d"%(self.effect_suffix(i),j))
+
+			return a
+
+		return None
+
 	def effect_sample(self,i,j,k=None,l=None):
 
 		if k is None:
 			return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
 
 		return np.dot(self.effect_contrast_array(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
+
+	def finitePopulationVarianceSample(self,i,k=None):
+		"""Transform function for the finite population variance for an effect."""
+		if k is None:
+			a = self.effectArray(i)
+			p = self.projectionMatrices[i]
+			return 1./(self.mk[i]-1)*np.diag(np.dot(a,np.dot(p,a.T)))
+
+		return None
 
 	def effectContrastMatrix(self,i,k=None,full=False):
 		if not full:
@@ -117,6 +143,13 @@ class FANOVA(Base):
 			h = convert(h)
 		return h
 
+	def _projectionMatrix(self,i,k=None):
+		if k is None:
+			c = np.ones((self.mk[i],1))
+			return np.eye(c.shape[0]) - np.dot(c,np.dot(np.linalg.inv(np.dot(c.T,c)),c.T))
+
+		return None
+
 	def function_names(self):
 		fxn_names = {0:'mean'}
 
@@ -150,6 +183,14 @@ class FANOVA(Base):
 			return ["%s%s_%d(%s)" % (self.effect_suffix(k),s,l,z) for z in self._observation_index_base()]
 
 		return ["(%s,%s)%s_(%d,%d)(%s)" % (self.effect_suffix(k),self.effect_suffix(i),s,l,j,z) for z in self._observation_index_base()]
+
+	def fsvIndexToCache(self,i,k=None):
+		"""indices for the finite population variance estimates"""
+
+		if k is None:
+			return ["%s_finitePopulationVariance(%s)" % (self.effect_suffix(i),z) for z in self._observation_index_base()]
+
+		return None
 
 	def effect_index(self,i,j):
 		"""index of effect function in design matrix."""
