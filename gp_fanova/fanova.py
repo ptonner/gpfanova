@@ -225,3 +225,17 @@ class FANOVA(Base):
 						ind += (self.mk[i]-1)*(self.mk[j]-1)
 
 		return x
+
+	def relativeInteraction(self,i,j,k,l,i0=None,k0=None):
+		if not self.interactions:
+			return None
+
+		if i0 is None:
+			i0 = 0
+		if k0 is None:
+			k0 = 0
+
+		return self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),j,l)).values -\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),j,k0)).values -\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),i0,l)).values +\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),i0,k0)).values

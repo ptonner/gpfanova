@@ -75,6 +75,11 @@ class SamplerContainer(object):
 		if verbose:
 			logger.info("%d samples finished in %.2lf minutes" % (n, (time.time() - start_time)/60))
 
+	def parameterSamples(self,name):
+		if not name in self.sampler_dict:
+			return None
+		return self.parameter_history[self.sampler_dict[name].parameters]
+
 	def store(self):
 		self.parameter_history = self.parameter_history.append(self.parameter_cache,ignore_index=True)
 		self.parameter_history.index = range(self.parameter_history.shape[0])
