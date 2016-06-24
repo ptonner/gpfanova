@@ -85,6 +85,70 @@ def generate_commands(n=10,interactions=False):
 
 	return ret
 
+def analyze():
+	import os,re
+	import gp_fanova
+	import matplotlib.pyplot as plt
+
+	resultsDir = "results/cokol"
+	outputDir = os.path.join(resultsDir,'figures')
+	results = os.listdir(resultsDir)
+	results.remove('figures')
+
+	for res in results:
+		match = re.match("([0-9a-zA-Z]+)-([0-9a-zA-Z]+)_interactions.csv",res)
+		if not match:
+			continue
+		a1,a2 = match.groups()
+		print a1,a2
+		m,_,_,_,_ = loadModel(a1,a2,t0=6,thin=False)
+
+		pair_dir = os.path.join(outputDir,'%s_%s'%(a1,a2))
+		if not '%s_%s'%(a1,a2) in os.listdir(outputDir):
+			os.mkdir(pair_dir)
+
+
+		plt.figure(figsize=(16,8))
+		plt.subplot(121)
+		plt.title(a1,fontsize=20)
+		gp_fanova.plot.plotSingleEffect(m,0,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
+		plt.subplot(122)
+		plt.title(a2,fontsize=20)
+		gp_fanova.plot.plotSingleEffect(m,1,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
+		plt.tight_layout()
+		plt.savefig(os.path.join(pair_dir,'singleEffectFunctions.png'))
+		plt.close()
+
+		plt.figure(figsize=(16,8))
+		plt.subplot(121)
+		plt.title(a1,fontsize=20)
+		gp_fanova.plot.plotSingleEffect(m,0,data=True,individual=True,empirical=True);
+		plt.subplot(122)
+		plt.title(a2,fontsize=20)
+		gp_fanova.plot.plotSingleEffect(m,1,data=True,individual=True,empirical=True);
+		plt.tight_layout()
+		plt.savefig(os.path.join(pair_dir,'singleEffectData.png'))
+		plt.close()
+
+		plt.figure(figsize=(20,20))
+		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True);
+		plt.tight_layout()
+		plt.savefig(os.path.join(pair_dir,'interactionRelativeFixed.png'))
+		plt.close()
+
+		plt.figure(figsize=(20,20))
+		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True,controlFixed=False);
+		plt.tight_layout()
+		plt.savefig(os.path.join(pair_dir,'interactionRelativeDynamic.png'))
+		plt.close()
+
+		plt.figure(figsize=(20,20))
+		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=False);
+		plt.tight_layout()
+		plt.savefig(os.path.join(pair_dir,'interactionActual.png'))
+		plt.close()
+
+
 if __name__ == "__main__":
 	import argparse, gp_fanova
 
@@ -97,11 +161,15 @@ if __name__ == "__main__":
 	                   help='include interactions in the model')
 	parser.add_argument('-g', dest='generateCommands', action='store_true',
 	                   help='generate the commands for this script')
+	parser.add_argument('-a', dest='analyze', action='store_true',
+	                   help='analyze the output of this script')
 
 	args = parser.parse_args()
 
 	if args.generateCommands:
 		print '\n'.join(generate_commands(args.n_samples,args.interactions))
+	elif args.analyze:
+		analyze()
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
 		x,y,effect,_ = load(a1,a2,t0=6,step=2)
