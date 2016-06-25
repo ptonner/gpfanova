@@ -4,7 +4,7 @@
 
 import pstats, cProfile
 
-import data,gp_fanova
+import data,gpfanova
 
 def profile(m,n=10):
 	m.sample(n,1)
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 		x,y,effect,_ = data.hsalinarum_beer_data()
 	elif d == "strain":
 		x,y,effect = data.hsalinarum_strain_data(['trmB','rosR'])
-	m = gp_fanova.fanova.FANOVA(x,y,effect,hyperparam_kwargs={'y_sigma':(.1,10),'sigma':(.3,10),'lengthscale':(.3,10)})
+	m = gpfanova.fanova.FANOVA(x,y,effect,hyperparam_kwargs={'y_sigma':(.1,10),'sigma':(.3,10),'lengthscale':(.3,10)})
 
 	cProfile.runctx("profile(m)", globals(), locals(), "Profile.prof")
 

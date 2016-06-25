@@ -66,10 +66,10 @@ def load(a1,a2,t0=0,step=1,thin=True):
 	return x,y,effect,labels
 
 def loadModel(a1,a2,**kwargs):
-	import gp_fanova
+	import gpfanova
 
 	x,y,effect,labels = load(a1,a2,**kwargs)
-	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
 	return m,x,y,effect,labels
 
 def generate_commands(n=10,interactions=False):
@@ -87,7 +87,7 @@ def generate_commands(n=10,interactions=False):
 
 def analyze():
 	import os,re
-	import gp_fanova
+	import gpfanova
 	import matplotlib.pyplot as plt
 
 	resultsDir = "results/cokol"
@@ -111,10 +111,10 @@ def analyze():
 		plt.figure(figsize=(16,8))
 		plt.subplot(121)
 		plt.title(a1,fontsize=20)
-		gp_fanova.plot.plotSingleEffect(m,0,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
+		gpfanova.plot.plotSingleEffect(m,0,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
 		plt.subplot(122)
 		plt.title(a2,fontsize=20)
-		gp_fanova.plot.plotSingleEffect(m,1,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
+		gpfanova.plot.plotSingleEffect(m,1,function=True,offset=False,alpha=.01,variance=False,burnin=0,origin=True,_mean=False);
 		plt.tight_layout()
 		plt.savefig(os.path.join(pair_dir,'singleEffectFunctions.png'))
 		plt.close()
@@ -122,35 +122,35 @@ def analyze():
 		plt.figure(figsize=(16,8))
 		plt.subplot(121)
 		plt.title(a1,fontsize=20)
-		gp_fanova.plot.plotSingleEffect(m,0,data=True,individual=True,empirical=True);
+		gpfanova.plot.plotSingleEffect(m,0,data=True,individual=True,empirical=True);
 		plt.subplot(122)
 		plt.title(a2,fontsize=20)
-		gp_fanova.plot.plotSingleEffect(m,1,data=True,individual=True,empirical=True);
+		gpfanova.plot.plotSingleEffect(m,1,data=True,individual=True,empirical=True);
 		plt.tight_layout()
 		plt.savefig(os.path.join(pair_dir,'singleEffectData.png'))
 		plt.close()
 
 		plt.figure(figsize=(20,20))
-		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True);
+		gpfanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True);
 		plt.tight_layout()
 		plt.savefig(os.path.join(pair_dir,'interactionRelativeFixed.png'))
 		plt.close()
 
 		plt.figure(figsize=(20,20))
-		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True,controlFixed=False);
+		gpfanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=True,controlFixed=False);
 		plt.tight_layout()
 		plt.savefig(os.path.join(pair_dir,'interactionRelativeDynamic.png'))
 		plt.close()
 
 		plt.figure(figsize=(20,20))
-		gp_fanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=False);
+		gpfanova.plot.plotInteraction(m,0,1,function=True,subplots=True,origin=True,offset=False,relative=False);
 		plt.tight_layout()
 		plt.savefig(os.path.join(pair_dir,'interactionActual.png'))
 		plt.close()
 
 
 if __name__ == "__main__":
-	import argparse, gp_fanova
+	import argparse, gpfanova
 
 	parser = argparse.ArgumentParser(description='Run analysis of Cokol et al. data.')
 	parser.add_argument('antibiotics',metavar=('A'), type=str, nargs='*',
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
 		x,y,effect,_ = load(a1,a2,t0=6,step=2)
-		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_covert=True)
+		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_covert=True)
 
 		s = ''
 		if args.interactions:

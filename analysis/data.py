@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy, pyDOE
 import matplotlib.pyplot as plt
-import gp_fanova
+import gpfanova
 
 
 
@@ -19,16 +19,16 @@ import gp_fanova
 #
 # cov = np.eye(50)*.1
 #
-# y[:,:3] = gp_fanova._mu_sample + scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,0],cov,3).T
-# y[:,3:6] = gp_fanova._mu_sample + scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,1],cov,3).T
-# y[:,6:9] = gp_fanova._mu_sample + scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,2],cov,3).T
-# y[:,9:12] = gp_fanova._mu_sample + scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,3],cov,3).T
-# # y[:,12:] = gp_fanova._mu_sample + scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,3],cov,3).T
+# y[:,:3] = gpfanova._mu_sample + scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,0],cov,3).T
+# y[:,3:6] = gpfanova._mu_sample + scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,1],cov,3).T
+# y[:,6:9] = gpfanova._mu_sample + scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,2],cov,3).T
+# y[:,9:12] = gpfanova._mu_sample + scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,3],cov,3).T
+# # y[:,12:] = gpfanova._mu_sample + scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,3],cov,3).T
 #
-# # y[:,:3] = scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,0],cov,3).T
-# # y[:,3:6] = scipy.stats.multivariate_normal.rvs(gp_fanova.alpha_samples[:,1],cov,3).T
+# # y[:,:3] = scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,0],cov,3).T
+# # y[:,3:6] = scipy.stats.multivariate_normal.rvs(gpfanova.alpha_samples[:,1],cov,3).T
 #
-# m = model.GP_FANOVA(x,y,effect)
+# m = model.gpfanova(x,y,effect)
 
 # def sample_data(nk):
 # 	y = np.zeros((50,sum(nk)))
@@ -48,7 +48,7 @@ def one_effect_data(effects=3,n=50,r=2,add_fake_effect=False):
 
 	effect = np.array(e)[:,None]
 
-	m = gp_fanova.fanova.FANOVA(x,y,effect,helmert_covert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,helmert_covert=True)
 	y,_ = m.samplePrior()
 	# y,_ = m.samplePrior()
 
@@ -66,7 +66,7 @@ def two_effect_data(e1=2,e2=2,n=3,**kwargs):
 	effect = np.array(pyDOE.fullfact([e1,e2]).tolist()*n).astype(int)
 	y = np.zeros((50,effect.shape[0]))
 
-	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
+	m = gpfanova.fanova.FANOVA(x,y,effect,**kwargs)
 	y,f_samples = m.samplePrior()
 
 	return x,y,effect,f_samples
@@ -84,7 +84,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 		effect = np.array([[np.random.choice(range(e)) for e in effects] for i in range(m)])
 	y = np.zeros((n,effect.shape[0]))
 
-	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
+	m = gpfanova.fanova.FANOVA(x,y,effect,**kwargs)
 	y,f_samples = m.samplePrior()
 
 	return x,y,effect,f_samples

@@ -1,4 +1,4 @@
-import gp_fanova, data
+import gpfanova, data
 
 def get(p,numIndividual,f=False,n=10,interaction=False):
 
@@ -10,7 +10,7 @@ def get(p,numIndividual,f=False,n=10,interaction=False):
 		pf = "results/qtl/parameters_%s%d.csv"%(s,n)
 
 	x,y,effect,labels = data.multiple_effects([2]*p,numIndividual,fullFactorial=False,helmert_convert=True)
-	m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameter_file=pf,helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameter_file=pf,helmert_convert=True)
 
 	if f is None:
 		m.parameter_cache['y_sigma'] = -2
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
 	for i in range(p):
 		# plt.figure(figsize=(20,20))
-		gp_fanova.plot.plotSingleEffect(m,i,data=True,_mean=False,offset=False,alpha=.5,empirical=True,individual=True);
+		gpfanova.plot.plotSingleEffect(m,i,data=True,_mean=False,offset=False,alpha=.5,empirical=True,individual=True);
 		plt.savefig("results/qtl/data_%d.png"%i,bbox_inches="tight",dpi=300)
 		plt.close()
 
