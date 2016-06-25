@@ -29,8 +29,8 @@ def _plot_param_correlation(m,param1,param2,logspace,burnin):
 def _plot_hyper_params_correlative(m,logspace,burnin,*args,**kwargs):
 
 	params = ['y_sigma']
-	for i in range(len(m.prior_groups())):
-		params.extend(m._prior_parameters(i))
+	for i in range(len(m.priorGroups())):
+		params.extend(m._priorParameters(i))
 
 	s = len(params)
 
@@ -73,8 +73,8 @@ def _plot_hyper_params_histogram(m,logspace,*args,**kwargs):
 		plt.title(param,fontsize=20)
 
 	params = ['y_sigma']
-	for i in range(len(m.prior_groups)):
-		params.append(m._prior_parameters(i))
+	for i in range(len(m.priorGroups)):
+		params.append(m._priorParameters(i))
 
 	s = len(params)
 	for i in range(len(params)):

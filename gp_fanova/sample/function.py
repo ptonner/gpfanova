@@ -12,7 +12,7 @@ class Function(Sampler):
 
 	def _sample(self):
 
-		m = self.base.function_residual(self.f)
+		m = self.base.functionResidual(self.f)
 		# n = m.shape[0]
 		# m = m.mean(0)
 
@@ -48,7 +48,7 @@ class FunctionDerivative(Sampler):
 
 	def _params(self):
 		ka_inv = self.kernel.K_inv(self.base.x)
-		obs = self.base.function_matrix(only=[self.f])
+		obs = self.base.functionMatrix(only=[self.f])
 		kb = self.kernel.dK(self.base.x,)
 		kba = self.kernel.dK(self.base.x,cross=True)
 

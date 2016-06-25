@@ -18,7 +18,7 @@ def get(p,numIndividual,f=False,n=10,interaction=False):
 		for i in range(p):
 			m.parameter_cache['prior%d_lengthscale'%(i+1)] = np.random.normal(-.5,.3)
 			m.parameter_cache['prior%d_sigma'%(i+1)] = np.random.normal(0,.3)
-		m.y,_ = m.sample_prior()
+		m.y,_ = m.samplePrior()
 
 	return m,x,y,effect,labels
 

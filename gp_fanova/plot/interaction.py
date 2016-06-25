@@ -43,17 +43,16 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 					r = .4
 					c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
 
-				# samples = m.effect_samples(k,j)[burnin:,:]
 				if relative:
 					if controlFixed:
 						samples = m.relativeInteraction(i,j+1,k,l+1)
 					else:
 						samples = m.relativeInteraction(i,j+1,k,l+1,j,l)
 				else:
-					samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effect_suffix(i),m.effect_suffix(k),j,l)).values[burnin:,:]
+					samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effectSuffix(i),m.effectSuffix(k),j,l)).values[burnin:,:]
 					if offset:
-						samples += m.parameterSamples("%s_%d" %(m.effect_suffix(i),j)).values[burnin:,:]
-						samples += m.parameterSamples("%s_%d" %(m.effect_suffix(k),l)).values[burnin:,:]
+						samples += m.parameterSamples("%s_%d" %(m.effectSuffix(i),j)).values[burnin:,:]
+						samples += m.parameterSamples("%s_%d" %(m.effectSuffix(k),l)).values[burnin:,:]
 
 				mean = samples.mean(0)
 				std = samples.std(0)
@@ -78,10 +77,10 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 				else:
 					samples = m.relativeInteraction(i,j+1,k,l+1,j,l)
 			else:
-				samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effect_suffix(i),m.effect_suffix(k),j,kv)).values[burnin:,:]
+				samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effectSuffix(i),m.effectSuffix(k),j,kv)).values[burnin:,:]
 				if offset:
-					samples += m.parameterSamples("%s_%d" %(m.effect_suffix(i),j)).values[burnin:,:]
-					samples += m.parameterSamples("%s_%d" %(m.effect_suffix(k),kv)).values[burnin:,:]
+					samples += m.parameterSamples("%s_%d" %(m.effectSuffix(i),j)).values[burnin:,:]
+					samples += m.parameterSamples("%s_%d" %(m.effectSuffix(k),kv)).values[burnin:,:]
 
 			mean = samples.mean(0)
 			std = samples.std(0)

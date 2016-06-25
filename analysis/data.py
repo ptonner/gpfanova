@@ -49,8 +49,8 @@ def one_effect_data(effects=3,n=50,r=2,add_fake_effect=False):
 	effect = np.array(e)[:,None]
 
 	m = gp_fanova.fanova.FANOVA(x,y,effect,helmert_covert=True)
-	y,_ = m.sample_prior()
-	# y,_ = m.sample_prior()
+	y,_ = m.samplePrior()
+	# y,_ = m.samplePrior()
 
 	if add_fake_effect:
 		temp = np.zeros((6,2))
@@ -67,7 +67,7 @@ def two_effect_data(e1=2,e2=2,n=3,**kwargs):
 	y = np.zeros((50,effect.shape[0]))
 
 	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
-	y,f_samples = m.sample_prior()
+	y,f_samples = m.samplePrior()
 
 	return x,y,effect,f_samples
 
@@ -85,7 +85,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 	y = np.zeros((n,effect.shape[0]))
 
 	m = gp_fanova.fanova.FANOVA(x,y,effect,**kwargs)
-	y,f_samples = m.sample_prior()
+	y,f_samples = m.samplePrior()
 
 	return x,y,effect,f_samples
 
@@ -312,7 +312,7 @@ def plot_model_vs_true(m,mean,effect,interaction):
 	for i in range(len(effect)):
 		for j in range(effect[i].shape[1]):
 			plt.subplot(nrows,ncols,ncols+1+ind)
-			plt.plot(m.parameter_history[m.effect_index(i,j)].T.values,c='k',alpha=.1); plt.plot(effect[i][:,j],c='r');
+			plt.plot(m.parameter_history[m.effectIndex(i,j)].T.values,c='k',alpha=.1); plt.plot(effect[i][:,j],c='r');
 			plt.title("%d, %d" %(i,j))
 			ind += 1
 
@@ -320,6 +320,6 @@ def plot_model_vs_true(m,mean,effect,interaction):
 	for i in range(interaction.shape[1]):
 		for j in range(interaction.shape[2]):
 			plt.subplot(nrows,ncols,2*ncols+1+ind)
-			plt.plot(m.parameter_history[m.effect_interaction_index(1,j,0,i)].T.values,c='k',alpha=.1); plt.plot(interaction[:,i,j],c='r');
+			plt.plot(m.parameter_history[m.effectInteractionIndex(1,j,0,i)].T.values,c='k',alpha=.1); plt.plot(interaction[:,i,j],c='r');
 			plt.title("%d, %d" %(i,j))
 			ind += 1

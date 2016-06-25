@@ -14,7 +14,7 @@ def buildModel(p,m,n):
 		m.parameter_cache['prior%d_lengthscale'%(i+1)] = np.random.normal(-.5,.3)#np.random.uniform(-1,0)
 		m.parameter_cache['prior%d_sigma'%(i+1)] = np.random.normal(0,.5)#np.random.uniform(-1,0)
 	# m.parameter_cache['prior1_lengthscale'] = -2
-	m.y,_ = m.sample_prior()
+	m.y,_ = m.samplePrior()
 
 	return m,x,y,effect
 

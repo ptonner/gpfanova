@@ -28,10 +28,9 @@ def _plot_function(m,i,k,subplots=None,_mean=False,offset=False,interactions=Fal
 				r = .4
 				c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
 
-			# samples = m.effect_samples(k,j)[burnin:,:]
-			samples = m.parameter_history[m.effect_index_to_cache(i,j)].values[burnin:,:] + m.parameter_history[m.effect_index_to_cache(k,l)].values[burnin:,:]
+			samples = m.parameter_history[m.effectIndexToCache(i,j)].values[burnin:,:] + m.parameter_history[m.effectIndexToCache(k,l)].values[burnin:,:]
 			if offset:
-				samples += m.parameter_history[m.function_index(0)].values[burnin:,:]
+				samples += m.parameter_history[m.functionIndex(0)].values[burnin:,:]
 
 			if interactions:
 				pass
@@ -46,8 +45,8 @@ def _plot_function(m,i,k,subplots=None,_mean=False,offset=False,interactions=Fal
 			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
 
 		# if _mean:
-		# 	mean = m.parameter_history[m.function_index(0)].values[burnin:,:].mean(0)
-		# 	std = m.parameter_history[m.function_index(0)].values[burnin:,:].std(0)
+		# 	mean = m.parameter_history[m.functionIndex(0)].values[burnin:,:].mean(0)
+		# 	std = m.parameter_history[m.functionIndex(0)].values[burnin:,:].std(0)
 		#
 		# 	plt.plot(m.x,mean,'k')
 		# 	plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')

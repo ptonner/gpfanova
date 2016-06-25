@@ -26,54 +26,54 @@ class FANOVA(Base):
 				if self.interactions:
  					self.contrasts_interaction[(j,i)] = np.kron(self.contrasts[j],self.contrasts[i])
 					self.projectionMatrices[(j,i)] = self._projectionMatrix(j,i)
-		self._effect_interaction_index = {} # starting index for each interaction in function matrix
+		self._effectInteractionIndex = {} # starting index for each interaction in function matrix
 
 		Base.__init__(self,x,y,*args,**kwargs)
 
-	def has_interaction(self,i,k):
+	def hasInteraction(self,i,k):
 		return self.interactions
 
-	def effect_suffix(self,k):
+	def effectSuffix(self,k):
 		if self.k <= len(FANOVA.EFFECT_SUFFIXES):
 			return FANOVA.EFFECT_SUFFIXES[k]
 		else:
 			return 'effect%d'%k
 
-	def _additional_samplers(self):
+	def _additionalSamplers(self):
 		ret = []
 
 		for k in range(self.k):
 			if self.effect_transforms:
 				for l in range(self.mk[k]):
-					ret.append(Transform('%s_%d'%(self.effect_suffix(k),l),
-											self.effect_index_to_cache(k,l),
-											lambda k=k,l=l : self.effect_sample(k,l)))
-				ret.append(Transform("%s_finiteSampleVariance"%self.effect_suffix(k),
+					ret.append(Transform('%s_%d'%(self.effectSuffix(k),l),
+											self.effectIndexToCache(k,l),
+											lambda k=k,l=l : self.effectSample(k,l)))
+				ret.append(Transform("%s_finiteSampleVariance"%self.effectSuffix(k),
 											self.fsvIndexToCache(k),
 											lambda k=k:self.finitePopulationVarianceSample(k)))
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
 				if self.interaction_transforms:
-					if self.has_interaction(i,k):
+					if self.hasInteraction(i,k):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
-								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effect_suffix(k),self.effect_suffix(i),l,j),
-												self.effect_index_to_cache(k,l,i,j),
-												lambda k=k,l=l,i=i,j=j : self.effect_sample(k,l,i,j)))
+								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effectSuffix(k),self.effectSuffix(i),l,j),
+												self.effectIndexToCache(k,l,i,j),
+												lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
 
 		return ret
 
-	def effect_contrast_array(self,i,k=None,deriv=False):
+	def effectContrastArray(self,i,k=None,deriv=False):
 
 		if k is None:
-			ind = range(self.effect_index(i,0),self.effect_index(i+1,0))
+			ind = range(self.effectIndex(i,0),self.effectIndex(i+1,0))
 		else:
 			if i == k-1:
-				ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i,0,k+1,0))
+				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i,0,k+1,0))
 			else:
-				ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i+1,0,k,0))
-		return self.function_matrix(only=ind)
+				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i+1,0,k,0))
+		return self.functionMatrix(only=ind)
 
 	def effectArray(self,i,k=None):
 		"""Get an array of effects from the parameter cache."""
@@ -81,18 +81,18 @@ class FANOVA(Base):
 		if k is None:
 			a = np.zeros((self.n,self.mk[i]))
 			for j in range(self.mk[i]):
-				a[:,j] = self.parameterCurrent("%s_%d"%(self.effect_suffix(i),j))
+				a[:,j] = self.parameterCurrent("%s_%d"%(self.effectSuffix(i),j))
 
 			return a
 
 		return None
 
-	def effect_sample(self,i,j,k=None,l=None):
+	def effectSample(self,i,j,k=None,l=None):
 
 		if k is None:
-			return np.dot(self.effect_contrast_array(i),self.contrasts[i][j,:])
+			return np.dot(self.effectContrastArray(i),self.contrasts[i][j,:])
 
-		return np.dot(self.effect_contrast_array(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
+		return np.dot(self.effectContrastArray(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
 
 	def finitePopulationVarianceSample(self,i,k=None):
 		"""Transform function for the finite population variance for an effect."""
@@ -114,16 +114,16 @@ class FANOVA(Base):
 		else:
 			if k is None:
 				a = np.zeros((self.mk[i],self.f))
-				a[:,self.effect_index(i,0):self.effect_index(i+1,0)] = self.contrasts[i]
+				a[:,self.effectIndex(i,0):self.effectIndex(i+1,0)] = self.contrasts[i]
 				return a
 			elif k < i:
 				return self.effectContrastMatrix(k,i,full)
 			else:
 				a = np.zeros((self.mk[i]*self.mk[k],self.f))
 				if i == k-1:
-					ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i,0,k+1,0))
+					ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i,0,k+1,0))
 				else:
-					ind = range(self.effect_interaction_index(i,0,k,0),self.effect_interaction_index(i+1,0,k,0))
+					ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i+1,0,k,0))
 				a[:,ind] = self.contrasts_interaction[(i,k)]
 				return a
 
@@ -150,25 +150,25 @@ class FANOVA(Base):
 
 		return None
 
-	def function_names(self):
+	def functionNames(self):
 		fxn_names = {0:'mean'}
 
 		ind = 1
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
-				fxn_names[ind] = "%s*_%d" % (self.effect_suffix(i),j)
+				fxn_names[ind] = "%s*_%d" % (self.effectSuffix(i),j)
 				ind += 1
 
 		for i in range(self.k):
 			for j in range(self.mk[i]-1):
 				for k in range(i+1,self.k):
 					for l in range(self.mk[k]-1):
-						fxn_names[ind] = "(%s,%s)*_(%d,%d)" % (self.effect_suffix(i),self.effect_suffix(k),j,l)
+						fxn_names[ind] = "(%s,%s)*_(%d,%d)" % (self.effectSuffix(i),self.effectSuffix(k),j,l)
 						ind += 1
 
 		return fxn_names
 
-	def effect_index_to_cache(self,k,l,i=None,j=None,contrast=False):
+	def effectIndexToCache(self,k,l,i=None,j=None,contrast=False):
 		"""return effect index to parameter cache"""
 
 		s = ''
@@ -177,29 +177,29 @@ class FANOVA(Base):
 
 		if not i is None:
 			if k > i:
-				return self.effect_index_to_cache(i,j,k,l,contrast)
+				return self.effectIndexToCache(i,j,k,l,contrast)
 
 		if i is None:
-			return ["%s%s_%d(%s)" % (self.effect_suffix(k),s,l,z) for z in self._observation_index_base()]
+			return ["%s%s_%d(%s)" % (self.effectSuffix(k),s,l,z) for z in self._observationIndexBase()]
 
-		return ["(%s,%s)%s_(%d,%d)(%s)" % (self.effect_suffix(k),self.effect_suffix(i),s,l,j,z) for z in self._observation_index_base()]
+		return ["(%s,%s)%s_(%d,%d)(%s)" % (self.effectSuffix(k),self.effectSuffix(i),s,l,j,z) for z in self._observationIndexBase()]
 
 	def fsvIndexToCache(self,i,k=None):
 		"""indices for the finite population variance estimates"""
 
 		if k is None:
-			return ["%s_finitePopulationVariance(%s)" % (self.effect_suffix(i),z) for z in self._observation_index_base()]
+			return ["%s_finitePopulationVariance(%s)" % (self.effectSuffix(i),z) for z in self._observationIndexBase()]
 
 		return None
 
-	def effect_index(self,i,j):
+	def effectIndex(self,i,j):
 		"""index of effect function in design matrix."""
 		return 1 + sum([m-1 for m in self.mk[:i]]) + j
 
-	def effect_interaction_index(self,i,j,k,l):
+	def effectInteractionIndex(self,i,j,k,l):
 		"""index of interaction function in design matrix."""
 		if i > k:
-			return self.effect_interaction_index(k,l,i,j)
+			return self.effectInteractionIndex(k,l,i,j)
 
 		if k >= self.k:
 			return self.f
@@ -215,7 +215,7 @@ class FANOVA(Base):
 			logger.warning("%d is out of range of effect %d with size %d" % (l,k,self.mk[k]))
 			return -1
 
-		return self._effect_interaction_index[(i,k)] + j*(self.mk[i]-1) + l
+		return self._effectInteractionIndex[(i,k)] + j*(self.mk[i]-1) + l
 
 		# mean + effects + interactions before i + interactions with i before k + i interactions before j + l
 		# return 1 + sum([m-1 for m in self.mk]) + \
@@ -223,7 +223,7 @@ class FANOVA(Base):
 		# 			sum([(m-1)*(self.mk[i]-1) for m in self.mk[:k]]) + \
 		# 			(j-1)*(self.mk[k]-1) + l
 
-	def prior_groups(self):
+	def priorGroups(self):
 		g = [[0]]
 
 		ind = 1
@@ -233,14 +233,14 @@ class FANOVA(Base):
 
 		for i in range(self.k):
 			for k in range(i+1,self.k):
-				if self.has_interaction(i,k):
+				if self.hasInteraction(i,k):
 					c = (self.mk[i]-1) * (self.mk[k]-1)
 					g.append(range(ind,ind+c))
 					ind += c
 
 		return g
 
-	def _build_design_matrix(self):
+	def _buildDesignMatrix(self):
 		d = 1
 		for i in range(self.k):
 			d += self.mk[i] - 1
@@ -262,7 +262,7 @@ class FANOVA(Base):
 					if self.interactions:
 						z = self.effect[s,i] * self.mk[j] + self.effect[s,j]
 						x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
-						self._effect_interaction_index[(i,j)] = ind
+						self._effectInteractionIndex[(i,j)] = ind
 						ind += (self.mk[i]-1)*(self.mk[j]-1)
 
 		return x
@@ -276,7 +276,7 @@ class FANOVA(Base):
 		if k0 is None:
 			k0 = 0
 
-		return self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),j,l)).values -\
-				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),j,k0)).values -\
-				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),i0,l)).values +\
-				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effect_suffix(i),self.effect_suffix(k),i0,k0)).values
+		return self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effectSuffix(i),self.effectSuffix(k),j,l)).values -\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effectSuffix(i),self.effectSuffix(k),j,k0)).values -\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effectSuffix(i),self.effectSuffix(k),i0,l)).values +\
+				self.parameterSamples("(%s,%s)_(%d,%d)" %(self.effectSuffix(i),self.effectSuffix(k),i0,k0)).values
