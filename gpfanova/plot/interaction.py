@@ -9,10 +9,16 @@ def plotInteraction(m,i,k,kv=None,function=False,data=False,derivative=False,**k
 	if derivative:
 		_plot_derivative(m,i,k,kv,**kwargs)
 
-def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,**kwargs):
+def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,relative=False,controlFixed=True,**kwargs):
 
-	ncol = m.mk[i]
-	nrow = m.mk[k]
+	m0 = m.mk[i]
+	m1 = m.mk[k]
+	if relative:
+		m0-=1
+		m1-=1
+
+	ncol = m0
+	nrow = m1
 	if not kv is None:
 		nrow = 1
 
@@ -21,24 +27,32 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 	if nrow*ncol > len(colors):
 		_cmap = plt.get_cmap('spectral')
 
-	for j in range(m.mk[i]):
+	for j in range(m0):
 		if kv is None:
-			for l in range(m.mk[k]):
+			for l in range(m1):
 
 				if subplots:
-					plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
+					plt.subplot(nrow,ncol,j+l*m0+1)
 					plt.title("%d,%d"%(j,l))
 					if origin:
 						plt.plot([m.x.min(),m.x.max()],[0,0],c='k',lw=3)
 
-				if m.mk[i]*m.mk[k] <= len(colors):
+				if m0*m1 <= len(colors):
 					c = colors[j+l*m.mk[i]]
 				else:
 					r = .4
 					c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
 
-				# samples = m.effect_samples(k,j)[burnin:,:]
-				samples = m.parameter_history[m.effect_index_to_cache(i,j,k,l)].values[burnin:,:]
+				if relative:
+					if controlFixed:
+						samples = m.relativeInteraction(i,j+1,k,l+1)
+					else:
+						samples = m.relativeInteraction(i,j+1,k,l+1,j,l)
+				else:
+					samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effectSuffix(i),m.effectSuffix(k),j,l)).values[burnin:,:]
+					if offset:
+						samples += m.parameterSamples("%s_%d" %(m.effectSuffix(i),j)).values[burnin:,:]
+						samples += m.parameterSamples("%s_%d" %(m.effectSuffix(k),l)).values[burnin:,:]
 
 				mean = samples.mean(0)
 				std = samples.std(0)
@@ -51,15 +65,22 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 				plt.plot(m.x,mean,color=c,label=l)
 				plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
 		else:
-			if m.mk[i] <= len(colors):
+			if m0 <= len(colors):
 				c = colors[j]
 			else:
 				r = .4
 				c = _cmap(r+(1-r)*(j+1)/(m.mk[i]+1))
 
-			samples = m.parameter_history[m.effect_index_to_cache(i,j,k,kv)].values[burnin:,:]
-			if offset:
-				samples += m.parameter_history[m.effect_index_to_cache(i,j)].values[burnin:,:]
+			if relative:
+				if controlFixed:
+					samples = m.relativeInteraction(i,j+1,k,l+1)
+				else:
+					samples = m.relativeInteraction(i,j+1,k,l+1,j,l)
+			else:
+				samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effectSuffix(i),m.effectSuffix(k),j,kv)).values[burnin:,:]
+				if offset:
+					samples += m.parameterSamples("%s_%d" %(m.effectSuffix(i),j)).values[burnin:,:]
+					samples += m.parameterSamples("%s_%d" %(m.effectSuffix(k),kv)).values[burnin:,:]
 
 			mean = samples.mean(0)
 			std = samples.std(0)
@@ -76,9 +97,9 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 			plt.legend(loc="best")
 
 	if subplots and kv is None:
-		for j in range(m.mk[i]):
-			for l in range(m.mk[k]):
-				plt.subplot(nrow,ncol,j+l*m.mk[i]+1)
+		for j in range(m0):
+			for l in range(m1):
+				plt.subplot(nrow,ncol,j+l*m0+1)
 				plt.ylim(ylim)
 	elif origin:
 		plt.plot([m.x.min(),m.x.max()],[0,0],c='k',lw=3)

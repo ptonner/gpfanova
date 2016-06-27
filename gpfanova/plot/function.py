@@ -3,7 +3,7 @@ import numpy as np
 
 def plot_function(m,f,c='b',alpha=.2,burnin=0):
 
-	samples = m.parameter_history[m.function_index(f)].values[burnin:,:]
+	samples = m.parameter_history[m.functionIndex(f)].values[burnin:,:]
 
 	mean = samples.mean(0)
 	std = samples.std(0)
@@ -13,7 +13,7 @@ def plot_function(m,f,c='b',alpha=.2,burnin=0):
 
 def plot_functions(m,f,c='b',alpha=.2,burnin=0):
 
-	samples = np.sum([f[j] * m.parameter_history[m.function_index(j)].values[burnin:,:] for j in range(len(f))],0)
+	samples = np.sum([f[j] * m.parameter_history[m.functionIndex(j)].values[burnin:,:] for j in range(len(f))],0)
 
 	mean = samples.mean(0)
 	std = samples.std(0)

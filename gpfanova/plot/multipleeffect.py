@@ -21,10 +21,10 @@ def _plot_function(m,_mean=False,offset=False,interactions=False,burnin=0,labels
 		for j in range(m.mk[i]):
 			plt.subplot(nrow,ncol,sum([mk*ncol for mk in m.mk[:i]])+j+1)
 			plt.title("%d,%d"%(i,j))
-			samples = m.parameter_history[m.effect_index_to_cache(i,j)].values[burnin:,:]
+			samples = m.parameter_history[m.effectIndexToCache(i,j)].values[burnin:,:]
 
 			if offset:
-				samples += m.parameter_history[m.function_index(0)].values[burnin:,:]
+				samples += m.parameter_history[m.functionIndex(0)].values[burnin:,:]
 
 			mean = samples.mean(0)
 			std = samples.std(0)
@@ -36,8 +36,8 @@ def _plot_function(m,_mean=False,offset=False,interactions=False,burnin=0,labels
 			plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
 
 		# if _mean:
-		# 	mean = m.parameter_history[m.function_index(0)].values[burnin:,:].mean(0)
-		# 	std = m.parameter_history[m.function_index(0)].values[burnin:,:].std(0)
+		# 	mean = m.parameter_history[m.functionIndex(0)].values[burnin:,:].mean(0)
+		# 	std = m.parameter_history[m.functionIndex(0)].values[burnin:,:].std(0)
 		#
 		# 	plt.plot(m.x,mean,'k')
 		# 	plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color='k')

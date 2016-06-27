@@ -12,7 +12,7 @@ class Function(Sampler):
 
 	def _sample(self):
 
-		m = self.base.function_residual(self.f)
+		m = self.base.functionResidual(self.f)
 		# n = m.shape[0]
 		# m = m.mean(0)
 
@@ -36,3 +36,29 @@ class Function(Sampler):
 	 	mu,cov = np.dot(A_inv,b), A_inv
 
 		return scipy.stats.multivariate_normal.rvs(mu,cov)
+
+
+class FunctionDerivative(Sampler):
+
+	def __init__(self,name,parameters,base,f,kernel):
+		Sampler.__init__(self,name,'Function',parameters,current_param_dependent=False)
+		self.base = base
+		self.f = f
+		self.kernel = kernel
+
+	def _params(self):
+		ka_inv = self.kernel.K_inv(self.base.x)
+		obs = self.base.functionMatrix(only=[self.f])
+		kb = self.kernel.dK(self.base.x,)
+		kba = self.kernel.dK(self.base.x,cross=True)
+
+		mu = np.dot(kba,np.dot(ka_inv,obs))
+		cov = kb - np.dot(kba,np.dot(ka_inv,kba.T))
+
+		return mu,cov
+
+	def _sample(self):
+
+		mu,cov = self._params()
+
+		return scipy.stats.multivariate_normal.rvs(mu[:,0],cov)

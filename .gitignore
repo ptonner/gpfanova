@@ -3,3 +3,13 @@
 *.so
 *.c
 *.csv
+data/
+.ipynb_checkpoints/
+Profile.prof
+bin/
+build/
+include/
+lib/
+local/
+pip-selfcheck.json
+results/
