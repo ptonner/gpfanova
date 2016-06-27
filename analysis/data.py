@@ -89,6 +89,57 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 
 	return x,y,effect,f_samples
 
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False):
+	data = pd.read_csv("data/hsalinarum/tidy_normalize_log_st0.csv",index_col=None)
+	conditions = ['Experiment','Well','Strain','standard','paraquat','osmotic','heatshock']
+	temp = data.set_index(conditions+['time'])
+	temp = temp[['OD']]
+
+	if len(strains)==0:
+		strains = ['ura3', 'hlx1', 'asnC', 'trh2', 'trh3', 'trh4', 'copR', 'kaiC',
+       'idr1', 'idr2', 'troR', 'phoU', 'prp2', 'birA', 'trmB', 'arcR',
+       'VNG0039', 'VNG2268', 'VNG0471', 'VNG1029', 'VNG2614', 'rosR',
+       'hlx2', 'cspD1', 'cspD2', 'sirR', 'VNG0194H', 'hrg']
+
+	# put data in s x n shape, with s samples and n timepoints
+	pivot = temp.unstack(-1)
+	pivot.columns = [t for s,t in pivot.columns.values]
+
+	effects = []
+	selectStrain = pivot.index.get_level_values('Strain').isin(strains)
+	selectCondition = pd.Series([False]*pivot.shape[0],index=pivot.index)
+	if standard:
+		selectCondition = selectCondition | (pivot.index.get_level_values('standard')==1)
+		effects+=['standard']
+	if paraquat:
+		selectCondition = selectCondition | (pivot.index.get_level_values('paraquat')==1)
+		effects+=['paraquat']
+	if osmotic:
+		selectCondition = selectCondition | (pivot.index.get_level_values('osmotic')==1)
+		effects+=['osmotic']
+	if heatshock:
+		selectCondition = selectCondition | (pivot.index.get_level_values('heatshock')==1)
+		effects+=['heatshock']
+	select = selectStrain & selectCondition
+	pivot = pivot.loc[select,:]
+
+	fact,labels = pd.factorize(pivot.index.get_level_values('Strain'))
+	e = []
+	for eff in effects:
+		e.append(pivot.index.get_level_values(eff))
+	e = np.array(e).T
+	e = np.where(e!=0)[1]
+	e = np.array([fact,e]).T
+	
+	if len(effects) <= 1:
+		e = e[:,0][:,None]
+
+	x = pivot.columns.values[:,None]
+	y = pivot.values.T
+
+	return x,y,e,labels
+
+
 def hsalinarum_data():
 	import patsy
 
