@@ -104,7 +104,7 @@ if __name__ == "__main__":
 		print '\n'.join(generate_commands(args.n_samples,args.interactions))
 	else:
 		a1,a2 = args.antibiotics[0],args.antibiotics[1]
-		x,y,effect,_ = load(a1,a2,t0=6,step=2)
+		x,y,effect,_ = load(a1,a2,t0=6,thin=False)
 		m = gp_fanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_covert=True)
 
 		s = ''
