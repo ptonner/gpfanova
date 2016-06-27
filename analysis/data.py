@@ -90,7 +90,12 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 	return x,y,effect,f_samples
 
 def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False):
-	data = pd.read_csv("data/hsalinarum/tidy_normalize_log_st0.csv",index_col=None)
+	import os
+	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
+	# print datadir
+	# print os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv")
+
+	data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv"),index_col=None)
 	conditions = ['Experiment','Well','Strain','standard','paraquat','osmotic','heatshock']
 	temp = data.set_index(conditions+['time'])
 	temp = temp[['OD']]
@@ -130,7 +135,7 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 	e = np.array(e).T
 	e = np.where(e!=0)[1]
 	e = np.array([fact,e]).T
-	
+
 	if len(effects) <= 1:
 		e = e[:,0][:,None]
 
