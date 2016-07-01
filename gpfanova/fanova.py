@@ -94,6 +94,10 @@ class FANOVA(Base):
 
 		return np.dot(self.effectContrastArray(i,k),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:])
 
+	def effectSamples(self,i,j,k=None,l=None,contrast=False):
+
+		return self.parameterSamples(self.effectName(i,j,k,l,contrast))
+
 	def finitePopulationVarianceSample(self,i,k=None):
 		"""Transform function for the finite population variance for an effect."""
 		if k is None:
@@ -167,6 +171,20 @@ class FANOVA(Base):
 						ind += 1
 
 		return fxn_names
+
+	def effectName(self,k,l,i=None,j=None,contrast=False,finiteVariance=False):
+		s = ""
+		if contrast:
+			s = "*"
+
+
+		if i is None:
+			return "%s%s_%d" % (self.effectSuffix(k),s,l)
+
+		if i < k:
+			return self.effectName(i,k,k,l,contrast,finiteVariance)
+
+		"(%s,%s)%s_(%d,%d)" % (self.effectSuffix(k),self.effectSuffix(i),s,l,j)
 
 	def effectIndexToCache(self,k,l,i=None,j=None,contrast=False):
 		"""return effect index to parameter cache"""
