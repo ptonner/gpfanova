@@ -89,7 +89,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 
 	return x,y,effect,f_samples
 
-def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False):
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False):
 	import os
 	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
 	# print datadir
@@ -127,6 +127,22 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 		effects+=['heatshock']
 	select = selectStrain & selectCondition
 	pivot = pivot.loc[select,:]
+
+	if mean:
+		new_pivot = []
+		new_index = []
+		for s in strains:
+			for e in effects:
+				ni = [s]+[0]*len(effects)
+				ni[effects.index(e)+1] = 1
+
+				select = (pivot.index.get_level_values('Strain')==s) & (pivot.index.get_level_values(e)==1)
+				temp = pivot.loc[select,:]
+				#print s,e,temp.shape[0]
+				new_index.append(tuple(ni))
+				new_pivot.append(temp.mean(0).values)
+		new_pivot = np.array(new_pivot)
+		pivot = pd.DataFrame(new_pivot,index=pd.MultiIndex.from_tuples(new_index,names=['Strain']+effects),columns=pivot.columns)
 
 	fact,labels = pd.factorize(pivot.index.get_level_values('Strain'))
 	e = []
