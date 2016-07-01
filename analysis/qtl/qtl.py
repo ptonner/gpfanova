@@ -10,7 +10,7 @@ def get(p,numIndividual,f=False,n=10,interaction=False):
 		pf = "results/qtl/parameters_%s%d.csv"%(s,n)
 
 	x,y,effect,labels = data.multiple_effects([2]*p,numIndividual,fullFactorial=False,helmert_convert=True)
-	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameter_file=pf,helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameterFile=pf,helmert_convert=True)
 
 	if f is None:
 		m.parameter_cache['y_sigma'] = -2

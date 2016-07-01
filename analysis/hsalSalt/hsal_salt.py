@@ -1,4 +1,4 @@
-import gpfanova, data
+import gpfanova, analysis
 
 def get(interaction,f=False,n=0):
 
@@ -9,8 +9,8 @@ def get(interaction,f=False,n=0):
 	if f:
 		pf = "results/hsal_beer_%s%d.csv"%(s,n)
 
-	x,y,effect,labels = data.hsalinarum_beer_data()
-	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameter_file=pf)
+	x,y,effect,labels = analysis.data.hsalinarum_beer_data()
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=interaction,parameterFile=pf)
 	return m,x,y,effect,labels
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import random as pyrandom
 
 class SamplerContainer(object):
 
-	def __init__(self,samplers,parameter_file=None,*args,**kwargs):
+	def __init__(self,samplers,parameterFile=None,*args,**kwargs):
 		self.samplers = [a for a in samplers if issubclass(type(a),Sampler)]
 		self.sampler_dict = {a.name:a for a in self.samplers}
 
@@ -17,7 +17,7 @@ class SamplerContainer(object):
 			if k in self.sampler_dict:
 				self.parameter_cache[self.sampler_dict[k].parameters] = v
 
-		self.load(parameter_file)
+		self.load(parameterFile)
 
 	def build_index(self):
 		ind = []

@@ -1,7 +1,9 @@
 import os
 import pandas as pd
 
-data_dir = "data/cokol_et_al_2011/"
+# print os.path.abspath(os.path.join(os.pardir,os.pardir,"data","cokol_et_al_2011/"))
+
+data_dir = os.path.abspath(os.path.join(os.pardir,os.pardir,"data","cokol_et_al_2011/"))
 data_files = os.listdir(data_dir)
 data_files.remove("README.txt")
 # data_files.remove(".DS_Store")
@@ -69,7 +71,7 @@ def loadModel(a1,a2,**kwargs):
 	import gpfanova
 
 	x,y,effect,labels = load(a1,a2,**kwargs)
-	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=True,parameter_file='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=True,parameterFile='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
 	return m,x,y,effect,labels
 
 def generate_commands(n=10,interactions=False):

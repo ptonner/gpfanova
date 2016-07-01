@@ -1,9 +1,9 @@
 
-
 if __name__ == "__main__":
 	import argparse, sys, os
 	sys.path.append("../..")
-	import gpfanova,analysis
+	import gpfanova, analysis
+
 
 	parser = argparse.ArgumentParser(description='Run analysis of Cokol et al. data.')
 	parser.add_argument('strains',metavar=('s'), type=str, nargs='*',
@@ -11,7 +11,7 @@ if __name__ == "__main__":
 	parser.add_argument('-n', dest='n_samples', action='store',default=10, type=int,
 	                   help='number of samples to generate from posterior')
 	parser.add_argument('-t', dest='thin', action='store',default=10, type=int,
-	                   help='thinning rate for the posterior')				   
+	                   help='thinning rate for the posterior')
 	parser.add_argument('-i', dest='interactions', action='store_true',
 	                   help='include interactions in the model')
 	parser.add_argument('-g', dest='generateCommands', action='store_true',
@@ -24,6 +24,10 @@ if __name__ == "__main__":
 	                   help='analyze paraquat data')
 	parser.add_argument('-o', dest='osmotic', action='store_true',
 	                   help='analyze osmotic data')
+	parser.add_argument('-e', dest='heatshock', action='store_true',
+	                   help='analyze heatshock data')
+	parser.add_argument('--helmertConvert', dest='helmertConvert', action='store_true',
+	                   help='helmertConvert toggle for gpfanova')
 
 	args = parser.parse_args()
 
@@ -34,14 +38,30 @@ if __name__ == "__main__":
 	else:
 		strains = args.strains
 		x,y,effect,_ = analysis.data.hsalinarum_TF(standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic)
-		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions)
+		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_convert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))
 
 
 		s = ''
 		if args.interactions:
-			s = '_interactions'
+			s += '_interactions'
+		if args.helmertConvert:
+			s += "_helmertConvert"
+		s+= "_"
+		temp = ''
+		if args.standard:
+			s += temp + "standard"
+			temp = '-'
+		if args.paraquat:
+			s += temp + "paraquat"
+			temp = '-'
+		if args.osmotic:
+			s += temp + "osmotic"
+			temp = '-'
+		if args.heatshock:
+			s += temp + "heatshock"
+			temp = '-'
 
 		try:
 			m.sample(args.n_samples,args.thin)
