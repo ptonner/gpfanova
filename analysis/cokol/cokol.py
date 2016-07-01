@@ -3,7 +3,7 @@ import pandas as pd
 
 # print os.path.abspath(os.path.join(os.pardir,os.pardir,"data","cokol_et_al_2011/"))
 
-data_dir = os.path.abspath(os.path.join(os.pardir,os.pardir,"data","cokol_et_al_2011/"))
+data_dir = os.path.abspath(os.path.join(__file__,os.pardir,os.pardir,os.pardir,"data","cokol_et_al_2011/"))
 data_files = os.listdir(data_dir)
 data_files.remove("README.txt")
 # data_files.remove(".DS_Store")
