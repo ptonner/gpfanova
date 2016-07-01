@@ -28,6 +28,8 @@ if __name__ == "__main__":
 	                   help='analyze heatshock data')
 	parser.add_argument('--helmertConvert', dest='helmertConvert', action='store_true',
 	                   help='helmertConvert toggle for gpfanova')
+	parser.add_argument('-m', dest='mean', action='store_true',
+	                   help='convert data to mean')
 
 	args = parser.parse_args()
 
@@ -37,7 +39,7 @@ if __name__ == "__main__":
 		analyze()
 	else:
 		strains = args.strains
-		x,y,effect,_ = analysis.data.hsalinarum_TF(standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic)
+		x,y,effect,_ = analysis.data.hsalinarum_TF(standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,mean=args.mean)
 		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_convert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))
@@ -48,6 +50,8 @@ if __name__ == "__main__":
 			s += '_interactions'
 		if args.helmertConvert:
 			s += "_helmertConvert"
+		if args.mean:
+			s+= '_mean'
 		s+= "_"
 		temp = ''
 		if args.standard:
