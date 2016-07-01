@@ -9,6 +9,57 @@ def plotInteraction(m,i,k,kv=None,function=False,data=False,derivative=False,**k
 	if derivative:
 		_plot_derivative(m,i,k,kv,**kwargs)
 
+def _plot_data(m,i,k,kv,subplots=True,**kwargs):
+	m0 = m.mk[i]
+	m1 = m.mk[k]
+
+	ncol = m0
+	nrow = m1
+	if not kv is None:
+		nrow = 1
+
+	ylim = (1e9,1e-9)
+
+	if nrow*ncol > len(colors):
+		_cmap = plt.get_cmap('spectral')
+
+	for j in range(m0):
+		if kv is None:
+			for l in range(m1):
+
+				if subplots:
+					plt.subplot(nrow,ncol,j+l*m0+1)
+					plt.title("%d,%d"%(j,l))
+
+				if m0*m1 <= len(colors):
+					c = colors[j+l*m.mk[i]]
+				else:
+					r = .4
+					c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
+
+				samples = m.y[:,(m.effect[:,i]==j)&(m.effect[:,k]==l)]
+				lb,ub = plotSamplesEmpirical(m.x,samples,**kwargs)
+				ylim = (min(ylim[0],min(lb)),max(ylim[1],max(ub)))
+
+		else:
+			if m0 <= len(colors):
+				c = colors[j]
+			else:
+				r = .4
+				c = _cmap(r+(1-r)*(j+1)/(m.mk[i]+1))
+
+			samples = m.y[:,(m.effect[:,i]==j)&(m.effect[:,k]==kv)]
+			lb,ub = plotSamplesEmpirical(m.x,samples,**kwargs)
+			ylim = (min(ylim[0],min(lb)),max(ylim[1],max(ub)))
+
+
+	if subplots and kv is None:
+		for j in range(m0):
+			for l in range(m1):
+				plt.subplot(nrow,ncol,j+l*m0+1)
+				plt.ylim(ylim)
+
+
 def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,relative=False,controlFixed=True,**kwargs):
 
 	m0 = m.mk[i]

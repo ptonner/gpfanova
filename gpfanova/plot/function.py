@@ -1,6 +1,19 @@
 from meta import *
 import numpy as np
 
+def plotFunctionSamples(samples,x=None,c='b',alpha=.2,burnin=0):
+
+	if x is None:
+		x = np.arange(samples.shape[1])
+	elif x.ndim > 1:
+		x = x[:,0]
+
+	samples = samples[burnin:,:]
+	mean = samples.mean(0)
+	std = samples.std(0)
+	plt.plot(x,mean,color=c)
+	plt.fill_between(x,mean-2*std,mean+2*std,alpha=alpha,color=c)
+
 def plot_function(m,f,c='b',alpha=.2,burnin=0):
 
 	samples = m.parameter_history[m.functionIndex(f)].values[burnin:,:]
