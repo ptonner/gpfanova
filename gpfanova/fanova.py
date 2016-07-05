@@ -8,15 +8,15 @@ class FANOVA(Base):
 
 	EFFECT_SUFFIXES = ['alpha','beta','gamma','delta','epsilon']
 
-	def __init__(self,x,y,effect,interactions=False,effect_transforms=True,interaction_transforms=True,helmert_convert=False,*args,**kwargs):
+	def __init__(self,x,y,effect,interactions=False,effectTransforms=True,interactionTransforms=True,helmertConvert=False,*args,**kwargs):
 		self.effect = effect
 		self.k = self.effect.shape[1] # number of effects
 		self.mk = [np.unique(self.effect[:,i]).shape[0] for i in range(self.k)] # number of levels for each effect
 
-		self.effect_transforms = effect_transforms
-		self.interaction_transforms = interaction_transforms
+		self.effectTransforms = effectTransforms
+		self.interactionTransforms = interactionTransforms
 		self.interactions = interactions
-		self.helmert_convert = helmert_convert
+		self.helmertConvert = helmertConvert
 
 		self.contrasts = [self.buildEffectContrastMatrix(i) for i in range(self.k)]
 		self.contrasts_interaction = {}
@@ -43,7 +43,7 @@ class FANOVA(Base):
 		ret = []
 
 		for k in range(self.k):
-			if self.effect_transforms:
+			if self.effectTransforms:
 				for l in range(self.mk[k]):
 					ret.append(Transform('%s_%d'%(self.effectSuffix(k),l),
 											self.effectIndexToCache(k,l),
@@ -54,7 +54,7 @@ class FANOVA(Base):
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
-				if self.interaction_transforms:
+				if self.interactionTransforms:
 					if self.hasInteraction(i,k):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
@@ -143,7 +143,7 @@ class FANOVA(Base):
 
 		h = Helmert().code_without_intercept(range(self.mk[i])).matrix
 
-		if self.helmert_convert:
+		if self.helmertConvert:
 			h = convert(h)
 		return h
 

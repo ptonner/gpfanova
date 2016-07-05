@@ -89,7 +89,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 
 	return x,y,effect,f_samples
 
-def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False):
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True):
 	import os
 	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
 	# print datadir
@@ -155,7 +155,12 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 	if len(effects) <= 1:
 		e = e[:,0][:,None]
 
-	x = pivot.columns.values[:,None]
+	x = pivot.columns.values
+
+	if scaleX:
+		x = (x-x.mean())/x.std()
+	x = x[:,None]
+
 	y = pivot.values.T
 
 	return x,y,e,labels

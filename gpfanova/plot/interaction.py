@@ -9,7 +9,7 @@ def plotInteraction(m,i,k,kv=None,function=False,data=False,derivative=False,**k
 	if derivative:
 		_plot_derivative(m,i,k,kv,**kwargs)
 
-def _plot_data(m,i,k,kv,subplots=True,**kwargs):
+def _plot_data(m,i,k,kv,subplots=True,actual=False,gradientEffect=None,gradientCmap='Blues',gradientThresh=.5,**kwargs):
 	m0 = m.mk[i]
 	m1 = m.mk[k]
 
@@ -38,8 +38,20 @@ def _plot_data(m,i,k,kv,subplots=True,**kwargs):
 					c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
 
 				samples = m.y[:,(m.effect[:,i]==j)&(m.effect[:,k]==l)]
-				lb,ub = plotSamplesEmpirical(m.x,samples,**kwargs)
-				ylim = (min(ylim[0],min(lb)),max(ylim[1],max(ub)))
+
+				if not actual:
+					lb,ub = plotSamplesEmpirical(m.x,samples,**kwargs)
+					lb,ub = min(lab),max(ub)
+				else:
+					if not gradientEffect is None:
+						temp = m.effect[(m.effect[:,i]==j)&(m.effect[:,k]==l),:]
+						_colors = [plt.get_cmap(gradientCmap)(1.*(2*gradientThresh+temp[z,gradientEffect])/(gradientThresh+m.mk[gradientEffect])) for z in range(temp.shape[0])]
+					else:
+						_colors = None
+					plotSamplesActual(m.x,samples,colors=_colors,**kwargs)
+					lb,ub = samples.min(),samples.max()
+
+				ylim = (min(ylim[0],lb),max(ylim[1],ub))
 
 		else:
 			if m0 <= len(colors):
@@ -60,7 +72,7 @@ def _plot_data(m,i,k,kv,subplots=True,**kwargs):
 				plt.ylim(ylim)
 
 
-def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,relative=False,controlFixed=True,**kwargs):
+def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,relative=False,controlFixed=True,color=None,**kwargs):
 
 	m0 = m.mk[i]
 	m1 = m.mk[k]
@@ -88,11 +100,14 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 					if origin:
 						plt.plot([m.x.min(),m.x.max()],[0,0],c='k',lw=3)
 
-				if m0*m1 <= len(colors):
-					c = colors[j+l*m.mk[i]]
+				if color is None:
+					if m0*m1 <= len(colors):
+						c = colors[j+l*m.mk[i]]
+					else:
+						r = .4
+						c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
 				else:
-					r = .4
-					c = _cmap(r+(1-r)*(j+l*m.mk[k]+1)/(m.mk[i]*m.mk[k]+1))
+					c = color
 
 				if relative:
 					if controlFixed:

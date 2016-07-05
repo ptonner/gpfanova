@@ -7,7 +7,7 @@ import numpy as np
 
 def buildModel(p,m,n):
 	x,y,effect,_ = data.multiple_effects([3]*p,m,n,False,seed=True)
-	m = gpfanova.fanova.FANOVA(x,y,effect,helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,helmertConvert=True)
 	m.parameter_cache['y_sigma'] = -2
 	m.parameter_cache['prior0_lengthscale'] = -1
 	for i in range(p):

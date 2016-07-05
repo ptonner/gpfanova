@@ -28,6 +28,8 @@ if __name__ == "__main__":
 	                   help='analyze heatshock data')
 	parser.add_argument('--helmertConvert', dest='helmertConvert', action='store_true',
 	                   help='helmertConvert toggle for gpfanova')
+	parser.add_argument('--scaleX', dest='scaleX', action='store_true',
+	                   help='scaleX toggle for data')
 	parser.add_argument('-m', dest='mean', action='store_true',
 	                   help='convert data to mean')
 
@@ -38,9 +40,8 @@ if __name__ == "__main__":
 	elif args.analyze:
 		analyze()
 	else:
-		strains = args.strains
-		x,y,effect,_ = analysis.data.hsalinarum_TF(standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,mean=args.mean)
-		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmert_convert=args.helmertConvert)
+		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,mean=args.mean,scaleX=args.scaleX)
+		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmertConvert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))
 
@@ -52,6 +53,8 @@ if __name__ == "__main__":
 			s += "_helmertConvert"
 		if args.mean:
 			s+= '_mean'
+		if args.scaleX:
+			s+= '_scaleX'
 		s+= "_"
 		temp = ''
 		if args.standard:
@@ -66,6 +69,9 @@ if __name__ == "__main__":
 		if args.heatshock:
 			s += temp + "heatshock"
 			temp = '-'
+
+		if len(args.strains)>0:
+			s += '_(%s)'%",".join(args.strains)
 
 		try:
 			m.sample(args.n_samples,args.thin)

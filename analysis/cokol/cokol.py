@@ -71,7 +71,7 @@ def loadModel(a1,a2,**kwargs):
 	import gpfanova
 
 	x,y,effect,labels = load(a1,a2,**kwargs)
-	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=True,parameterFile='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmert_convert=True)
+	m = gpfanova.fanova.FANOVA(x,y,effect,interactions=True,parameterFile='results/cokol/%s-%s_interactions.csv'%(a1,a2),helmertConvert=True)
 	return m,x,y,effect,labels
 
 def generate_commands(n=10,interactions=False):
