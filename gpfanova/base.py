@@ -43,6 +43,10 @@ class Base(SamplerContainer):
 			logger = logging.getLogger(__name__)
 			logger.error("design matrix is of rank %d, but there are %d functions!"%(np.linalg.matrix_rank(self.design_matrix),self.f))
 
+		if np.any(np.isnan(self.y)):
+			logger = logging.getLogger(__name__)
+			logger.error("NaN values in observation matrix, this is not supported yet!")
+
 		# kernel and sampler
 		self.y_k = White(self,['y_sigma'],logspace=True)
 		w,m = .1,10

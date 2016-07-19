@@ -42,7 +42,7 @@ if __name__ == "__main__":
 	elif args.analyze:
 		analyze()
 	else:
-		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects)
+		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects,nanRemove=True)
 		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmertConvert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))

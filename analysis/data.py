@@ -90,7 +90,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 	return x,y,effect,f_samples
 
 
-def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,batchEffects=False):
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,batchEffects=False,nanRemove=True):
 	import os
 	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
 	# print datadir
@@ -130,8 +130,6 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 	if heatshock:
 		selectCondition = selectCondition | (pivot.index.get_level_values('heatshock')==1)
 		effects+=['heatshock']
-	if plate:
-		otherEffects+=['Experiment']
 	select = selectStrain & selectCondition
 	pivot = pivot.loc[select,:]
 
@@ -158,9 +156,6 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 	e = np.array(e).T
 	e = np.where(e!=0)[1]
 
-	if len(effects) <= 1:
-		e = e[:,0][:,None]
-
 	if len(otherEffects)>0:
 		e2 = []
 		for eff in otherEffects:
@@ -168,7 +163,10 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 		e2 = np.array(e2).T
 		e = np.array([fact,e,e2]).T
 	else:
-		e = np.array([fact,e,]).T
+		if len(effects) <= 1:
+			e = np.array(fact)[:,None]
+		else:
+			e = np.array([fact,e,]).T
 
 	x = pivot.columns.values
 
@@ -177,6 +175,11 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 	x = x[:,None]
 
 	y = pivot.values.T
+
+	if nanRemove:
+		select = ~np.any(np.isnan(y),1)
+		y = y[select,:]
+		x = x[select,:]
 
 	return x,y,e,labels
 
