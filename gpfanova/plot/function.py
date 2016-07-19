@@ -1,7 +1,8 @@
 from meta import *
 import numpy as np
+from .. import interval as _interval
 
-def plotFunctionSamples(samples,x=None,c='b',alpha=.2,burnin=0):
+def plotFunctionSamples(samples,x=None,c='b',alpha=.2,burnin=0,interval=True,intervalKwargs={}):
 
 	if x is None:
 		x = np.arange(samples.shape[1])
@@ -11,6 +12,11 @@ def plotFunctionSamples(samples,x=None,c='b',alpha=.2,burnin=0):
 	samples = samples[burnin:,:]
 	mean = samples.mean(0)
 	std = samples.std(0)
+
+	epsilon = 0
+	if interval:
+		epsilon = _interval.functionInterval(samples,**intervalKwargs)
+
 	plt.plot(x,mean,color=c)
 	plt.fill_between(x,mean-2*std,mean+2*std,alpha=alpha,color=c)
 
