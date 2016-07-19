@@ -30,6 +30,8 @@ if __name__ == "__main__":
 	                   help='helmertConvert toggle for gpfanova')
 	parser.add_argument('--scaleX', dest='scaleX', action='store_true',
 	                   help='scaleX toggle for data')
+	parser.add_argument('--batchEffects', dest='batchEffects', action='store_true',
+	                   help='batchEffects toggle for data')
 	parser.add_argument('-m', dest='mean', action='store_true',
 	                   help='convert data to mean')
 
@@ -40,7 +42,7 @@ if __name__ == "__main__":
 	elif args.analyze:
 		analyze()
 	else:
-		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX)
+		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects)
 		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmertConvert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))
@@ -55,6 +57,8 @@ if __name__ == "__main__":
 			s+= '_mean'
 		if args.scaleX:
 			s+= '_scaleX'
+		if args.batchEffects:
+			s+= '_batchEffects'
 		s+= "_"
 		temp = ''
 		if args.standard:

@@ -89,13 +89,17 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 
 	return x,y,effect,f_samples
 
-def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,plate=False):
+
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,batchEffects=False):
 	import os
 	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
 	# print datadir
 	# print os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv")
 
-	data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv"),index_col=None)
+	if batchEffects:
+		data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0_batchEffects.csv"),index_col=None)
+	else:
+		data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv"),index_col=None)
 	conditions = ['Experiment','Well','Strain','standard','paraquat','osmotic','heatshock']
 	temp = data.set_index(conditions+['time'])
 	temp = temp[['OD']]
