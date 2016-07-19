@@ -72,7 +72,7 @@ def _plot_data(m,i,k,kv,subplots=True,actual=False,gradientEffect=None,gradientC
 				plt.ylim(ylim)
 
 
-def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labels=None,origin=False,relative=False,controlFixed=True,color=None,**kwargs):
+def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=None,offset=False,labels=None,origin=False,relative=False,controlFixed=True,color=None,**kwargs):
 
 	m0 = m.mk[i]
 	m1 = m.mk[k]
@@ -89,6 +89,9 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 
 	if nrow*ncol > len(colors):
 		_cmap = plt.get_cmap('spectral')
+
+	if subplots:
+		nrow,ncol = subplots
 
 	for j in range(m0):
 		if kv is None:
@@ -131,7 +134,15 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 				plt.plot(m.x,mean,color=c,label=l)
 				plt.fill_between(m.x[:,0],mean-2*std,mean+2*std,alpha=.2,color=c)
 		else:
-			if m0 <= len(colors):
+			if subplots:
+				plt.subplot(nrow,ncol,j+1)
+				plt.title("%d"%(j+1))
+				if origin:
+					plt.plot([m.x.min(),m.x.max()],[0,0],c='k',lw=3)
+
+			if not color is None:
+				c = color
+			elif m0 <= len(colors):
 				c = colors[j]
 			else:
 				r = .4
@@ -139,9 +150,9 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 
 			if relative:
 				if controlFixed:
-					samples = m.relativeInteraction(i,j+1,k,l+1)
+					samples = m.relativeInteraction(i,j+1,k,kv)
 				else:
-					samples = m.relativeInteraction(i,j+1,k,l+1,j,l)
+					samples = m.relativeInteraction(i,j+1,k,kv,j,kv-1)
 			else:
 				samples = m.parameterSamples("(%s,%s)_(%d,%d)" %(m.effectSuffix(i),m.effectSuffix(k),j,kv)).values[burnin:,:]
 				if offset:
@@ -162,10 +173,16 @@ def _plot_function(m,i,k,kv,_mean=False,burnin=0,subplots=True,offset=False,labe
 		if not labels is None:
 			plt.legend(loc="best")
 
-	if subplots and kv is None:
-		for j in range(m0):
-			for l in range(m1):
-				plt.subplot(nrow,ncol,j+l*m0+1)
+	if subplots:
+	 	if kv is None:
+			for j in range(m0):
+				for l in range(m1):
+					plt.subplot(nrow,ncol,j+l*m0+1)
+					plt.ylim(ylim)
+		else:
+			for j in range(m0):
+				plt.subplot(nrow,ncol,j+1)
 				plt.ylim(ylim)
+
 	elif origin:
 		plt.plot([m.x.min(),m.x.max()],[0,0],c='k',lw=3)
