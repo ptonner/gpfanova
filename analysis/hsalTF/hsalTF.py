@@ -12,6 +12,8 @@ if __name__ == "__main__":
 	                   help='number of samples to generate from posterior')
 	parser.add_argument('-t', dest='thin', action='store',default=10, type=int,
 	                   help='thinning rate for the posterior')
+	parser.add_argument('--label', dest='label', action='store',default='', type=str,
+	                   help='add a label to this run')
 	parser.add_argument('-i', dest='interactions', action='store_true',
 	                   help='include interactions in the model')
 	parser.add_argument('-g', dest='generateCommands', action='store_true',
@@ -76,6 +78,9 @@ if __name__ == "__main__":
 
 		if len(args.strains)>0:
 			s += '_(%s)'%",".join(args.strains)
+
+		if args.label!="":
+			s += "_%s"%args.label		
 
 		try:
 			m.sample(args.n_samples,args.thin)
