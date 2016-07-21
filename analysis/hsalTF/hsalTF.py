@@ -60,6 +60,8 @@ if __name__ == "__main__":
 							plates=['heatshock_12'])
 
 			import numpy as np
+
+			# columns: strain, ev, copr-vector
 			neweffects = np.zeros((5,3),dtype=int)
 			neweffects[labels.str.contains("VNG1179"),0] = 1
 			neweffects[labels.str.contains("copR"),0] = 1
@@ -109,10 +111,17 @@ if __name__ == "__main__":
 		if args.label!="":
 			s += "_%s"%args.label
 
-		try:
-			m.sample(args.n_samples,args.thin)
-		except Exception,e:
-			m.save(os.path.join(resultsDir,'results/hsalTF/hsalTF%s.csv'%(s)))
-			raise(e)
+		nrestarts = 0
+		while nrestarts < 10:
+			try:
+				m.sample(args.n_samples,args.thin)
+			except Exception,e:
+				m.save(os.path.join(resultsDir,'results/hsalTF/hsalTF%s.csv'%(s)))
+				nrestarts+=1
+
+				# try walking back the sampler
+				m.parameter_cache = m.parameter_history.iloc[-1,:]
+
+				print e
 
 		m.save(os.path.join(resultsDir,'results/hsalTF/hsalTF%s.csv'%(s)))
