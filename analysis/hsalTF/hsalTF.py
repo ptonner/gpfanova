@@ -14,6 +14,8 @@ if __name__ == "__main__":
 	                   help='thinning rate for the posterior')
 	parser.add_argument('--label', dest='label', action='store',default='', type=str,
 	                   help='add a label to this run')
+	parser.add_argument('--plates', dest='plates', action='store',default='', type=str,
+	                   help='plates to use in this run')
 	parser.add_argument('-i', dest='interactions', action='store_true',
 	                   help='include interactions in the model')
 	parser.add_argument('-g', dest='generateCommands', action='store_true',
@@ -34,6 +36,8 @@ if __name__ == "__main__":
 	                   help='scaleX toggle for data')
 	parser.add_argument('--batchEffects', dest='batchEffects', action='store_true',
 	                   help='batchEffects toggle for data')
+	parser.add_argument('--coprCompliment', dest='coprCompliment', action='store_true',
+	                   help='run coprCompliment analysis')
 	parser.add_argument('-m', dest='mean', action='store_true',
 	                   help='convert data to mean')
 
@@ -44,13 +48,36 @@ if __name__ == "__main__":
 	elif args.analyze:
 		analyze()
 	else:
-		x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects,nanRemove=True)
+
+		if not args.plates == '':
+			plates = args.plates.split(",")
+
+		if args.coprCompliment:
+
+			x,y,effect,labels = analysis.data.hsalinarum_TF(['ura3','ura3+pMTFcmyc','VNG1179C+pMTFcmyc','VNG1179C-VNG1179C','copR'],
+							standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=True,
+							mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects,nanRemove=True,
+							plates=['heatshock_12'])
+
+			import numpy as np
+			neweffects = np.zeros((5,3),dtype=int)
+			neweffects[labels.str.contains("VNG1179"),0] = 1
+			neweffects[labels.str.contains("copR"),0] = 1
+			neweffects[labels.str.contains("\+"),1] = 1
+			neweffects[labels=='VNG1179C-VNG1179C',[1,2]] = 1
+			effect = neweffects[effect[:,0],:]
+
+		else:
+			x,y,effect,_ = analysis.data.hsalinarum_TF(args.strains,standard=args.standard,paraquat=args.paraquat,osmotic=args.osmotic,heatshock=args.heatshock,mean=args.mean,scaleX=args.scaleX,batchEffects=args.batchEffects,nanRemove=True)
+
 		m = gpfanova.fanova.FANOVA(x,y,effect,interactions=args.interactions,helmertConvert=args.helmertConvert)
 
 		resultsDir = os.path.abspath(os.path.join(os.path.abspath(__file__),os.pardir,os.pardir,os.pardir))
 
 
 		s = ''
+		if args.coprCompliment:
+			s += "_coprCompliment"
 		if args.interactions:
 			s += '_interactions'
 		if args.helmertConvert:
@@ -80,7 +107,7 @@ if __name__ == "__main__":
 			s += '_(%s)'%",".join(args.strains)
 
 		if args.label!="":
-			s += "_%s"%args.label		
+			s += "_%s"%args.label
 
 		try:
 			m.sample(args.n_samples,args.thin)

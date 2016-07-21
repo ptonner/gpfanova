@@ -90,7 +90,7 @@ def multiple_effects(effects=[2,2],m=3,n=50,fullFactorial=True,seed=False,**kwar
 	return x,y,effect,f_samples
 
 
-def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,batchEffects=False,nanRemove=True):
+def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatshock=False,mean=False,scaleX=True,batchEffects=False,nanRemove=True,plates=None):
 	import os
 	datadir = os.path.abspath(os.path.join(os.path.abspath(__file__), os.pardir,os.pardir,'data'))
 	# print datadir
@@ -100,9 +100,15 @@ def hsalinarum_TF(strains=[],standard=False,paraquat=False,osmotic=False,heatsho
 		data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0_batchEffects.csv"),index_col=None)
 	else:
 		data = pd.read_csv(os.path.join(datadir,"hsalinarum/tidy_normalize_log_st0.csv"),index_col=None)
+
+	if not plates is None:
+		data = data.loc[data.Experiment.isin(plates)]
+
 	conditions = ['Experiment','Well','Strain','standard','paraquat','osmotic','heatshock']
 	temp = data.set_index(conditions+['time'])
 	temp = temp[['OD']]
+
+
 
 	if len(strains)==0:
 		strains = ['ura3', 'hlx1', 'asnC', 'trh2', 'trh3', 'trh4', 'copR', 'kaiC',
