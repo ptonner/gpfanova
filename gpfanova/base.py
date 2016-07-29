@@ -1,5 +1,5 @@
 from patsy.contrasts import Sum
-from sample import SamplerContainer, Gibbs, Slice, Fixed, Function, FunctionDerivative
+from sample import SamplerContainer, Slice, Fixed, Function, FunctionDerivative
 from kernel import RBF, White
 import numpy as np
 import scipy.stats, logging
