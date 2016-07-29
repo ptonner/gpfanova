@@ -122,6 +122,6 @@ if __name__ == "__main__":
 				# try walking back the sampler
 				m.parameter_cache = m.parameter_history.iloc[-1,:]
 
-				print e
+				print nrestarts, e
 
 		m.save(os.path.join(resultsDir,'results/hsalTF/hsalTF%s.csv'%(s)))
