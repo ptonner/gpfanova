@@ -203,6 +203,10 @@ class Base(SamplerContainer):
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
 
+		# remove missing values
+		mu = mu[~np.isnan(y)]
+		y = y[~np.isnan(y)]
+
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
 	def prior_likelihood(self,p,sigma=None,lengthscale=None):

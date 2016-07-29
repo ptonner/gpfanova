@@ -24,11 +24,13 @@ class Function(Sampler):
 		n = np.power(self.base.design_matrix[:,self.f],2)
 		n = n[n!=0]
 
+		missingValues = np.isnan(m)
+
 		# scale each residual contribution by its squared dm coefficient
-		m = np.sum((m.T*n).T,0)
+		m = np.nansum((m.T*n).T,0)
 
 		# sum for computing the final covariance
-		n = np.sum(n)
+		n = np.sum(((~missingValues).T*n).T,0)
 
 		y_inv = self.base.y_k.K_inv(self.base.x)
 		f_inv = self.kernel.K_inv(self.base.x)
