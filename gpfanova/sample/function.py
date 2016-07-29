@@ -1,6 +1,7 @@
 from . import Sampler
 import scipy
 import numpy as np
+from .. import linalg
 
 class Function(Sampler):
 
@@ -13,23 +14,30 @@ class Function(Sampler):
 	def _sample(self):
 
 		m = self.base.functionResidual(self.f)
-		# n = m.shape[0]
-		# m = m.mean(0)
 
-		# n = [np.power(self.base.design_matrix[i,self.f],2) for i in range(self.base.m)]
+		# in order to isolate the function f from the likelihood of each observation
+		# we have to divide by the design matrix coefficient, which leaves a
+		# multiplication to balance (which happens twice, e.g. squared).
+
+		# get the design matrix coefficient of each observtion for this function
+		# squared because it appears twice in the normal pdf exponential
 		n = np.power(self.base.design_matrix[:,self.f],2)
 		n = n[n!=0]
+
+		# scale each residual contribution by its squared dm coefficient
 		m = np.sum((m.T*n).T,0)
+
+		# sum for computing the final covariance
 		n = np.sum(n)
 
 		y_inv = self.base.y_k.K_inv(self.base.x)
 		f_inv = self.kernel.K_inv(self.base.x)
 
 		A = n*y_inv + f_inv
-		#b = n*np.dot(y_inv,m)
 		b = np.dot(y_inv,m)
 
-		chol_A = np.linalg.cholesky(A)
+		# chol_A = np.linalg.cholesky(A)
+		chol_A = linalg.jitchol(A)
 		chol_A_inv = np.linalg.inv(chol_A)
 		A_inv = np.dot(chol_A_inv.T,chol_A_inv)
 
