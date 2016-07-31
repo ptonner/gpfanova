@@ -10,9 +10,19 @@ setup(
   version='0.1',
   description='Functional ANOVA using Gaussian Process priors.',
   author='Peter Tonner',
-  email='peter.tonner@duke.edu',
+  author_email='peter.tonner@duke.edu',
   packages=['gpfanova','examples'],
   url='https://github.com/ptonner/gpfanova',
+
+  keywords='bayesian statistics time-course',
+
+  install_requires=[
+	  	'scipy>=0.17.1',
+		'numpy>=1.11.0',
+		'pandas>=0.18.1',
+		'Cython>=0.24',
+		'matplotlib>=1.5.1',
+	  ],
 
   classifiers=[
           'Development Status :: 3 - Alpha',
