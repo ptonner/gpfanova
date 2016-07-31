@@ -50,17 +50,18 @@ class Function(Sampler):
 
 class FunctionDerivative(Sampler):
 
-	def __init__(self,name,parameters,base,f,kernel):
+	def __init__(self,name,d,parameters,base,f,kernel):
 		Sampler.__init__(self,name,'Function',parameters,current_param_dependent=False)
 		self.base = base
+		self.d = d
 		self.f = f
 		self.kernel = kernel
 
 	def _params(self):
 		ka_inv = self.kernel.K_inv(self.base.x)
 		obs = self.base.functionMatrix(only=[self.f])
-		kb = self.kernel.dK(self.base.x,)
-		kba = self.kernel.dK(self.base.x,cross=True)
+		kb = self.kernel.dK(self.base.x,self.d)
+		kba = self.kernel.dK(self.base.x,self.d,cross=True)
 
 		mu = np.dot(kba,np.dot(ka_inv,obs))
 		cov = kb - np.dot(kba,np.dot(ka_inv,kba.T))

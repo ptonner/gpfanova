@@ -18,7 +18,22 @@ class Sampler(object):
 		else:
 			self.parameters = parameters
 
+		self.container = None
+
+	def setContainer(self,c):
+		self.container = c
+
 	def sample(self,*args,**kwargs):
+		args = []
+		if self.current_param_dependent:
+			args = [self.container.get(p) for p in self.parameters]
+			
+			# just use the parameter value if length one
+			# if len(args) == 1:
+			# 	param = param[0]
+			#
+			# args += [param]
+
 		return self._sample(*args,**kwargs)
 
 	def _sample(self,*args,**kwargs):
