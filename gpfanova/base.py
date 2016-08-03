@@ -13,81 +13,144 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,*args,**kwargs):
-		""" Construct the base functional model.
-
-		Args:
-			x: np.array (n x p), independent variables (not the design matrix!),
-				where obesrvations have been made
-			y: np.array (n x r), funtion observations
-		"""
-
-		self.x = x # independent variables
-		self.y = y # dependent variables
-
-		# this list will hold the strings representing the values where
-		# functions are to be sampled, e.g. x_1, x_2, ...
-		self._observationIndexBaseList = None
+	def __init__(self,x,y,designMatrix,priors,derivatives=False,*args,**kwargs):
+		self.x = x
+		self.y = y
 
 		self.n = self.x.shape[0]
 		assert self.y.shape[0] == self.n, 'x and y must have same first dimension shape!'
 		self.p = self.x.shape[1]
 		self.m = self.y.shape[1]
 
-		self.design_matrix = None
-		self.buildDesignMatrix()
+		self.derivatives = derivatives
 
-		# number of functions being estimated
-		self.f = self.design_matrix.shape[1]
+		self.designMatrix = designMatrix
+		self.f = self.designMatrix.shape[1]
+		self.priors = priors
 
-		if self.f > np.linalg.matrix_rank(self.design_matrix):
-			logger = logging.getLogger(__name__)
-			logger.error("design matrix is of rank %d, but there are %d functions!"%(np.linalg.matrix_rank(self.design_matrix),self.f))
+		self.checkDesignMatrix()
+		self.checkPriors()
 
-		if np.any(np.isnan(self.y)):
-			logger = logging.getLogger(__name__)
-			logger.error("NaN values in observation matrix, this is not supported yet!")
+		# this list will hold the strings representing the values where
+		# functions are to be sampled, e.g. x_1, x_2, ...
+		self._observationIndexBaseList = None
 
-		# kernel and sampler
 		self.y_k = White(self,['y_sigma'],logspace=True)
 		w,m = .1,10
-		if 'y_sigma' in hyperparam_kwargs:
-			w,m = hyperparam_kwargs['y_sigma']
-		elif 'sigma' in hyperparam_kwargs:
-			w,m = hyperparam_kwargs['sigma']
+		# if 'y_sigma' in hyperparam_kwargs:
+		# 	w,m = hyperparam_kwargs['y_sigma']
+		# elif 'sigma' in hyperparam_kwargs:
+		# 	w,m = hyperparam_kwargs['sigma']
 		samplers = [Slice('y_sigma','y_sigma',self.observationLikelihood,w,m)]
 
-		# function priors
-		self.kernels = []
-		fxn_names = self.functionNames()
-		for i,p in enumerate(self.priorGroups()):
-			self.kernels.append(RBF(self,['prior%d_sigma'%i]+['prior%d_lengthscale%d'%(i,d) for d in range(self.p)],logspace=True))
+		for p in self.priors:
+			samplers.extend(p.samplers())
 
-			for f in p:
-				if f in fxn_names:
-					s = fxn_names[f]
-				else:
-					s = "f%d"%f
-				samplers.append(Function('%s'%s,self.functionIndex(f),self,f,self.kernels[-1]))
-
-				if derivatives:
-					for d in range(self.p):
-						samplers.append(FunctionDerivative('d%s'%s,d,self.functionIndex(f,derivative=True),self,f,self.kernels[-1]))
-
-			w,m = .1,10
-			if 'sigma' in hyperparam_kwargs:
-				w,m = hyperparam_kwargs['sigma']
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p,x),w,m))
-
-			w,m = .1,10
-			if 'lengthscale' in hyperparam_kwargs:
-				w,m = hyperparam_kwargs['lengthscale']
-
-			for d in range(self.p):
-				samplers.append(Slice('prior%d_lengthscale%d'%(i,d),'prior%d_lengthscale%d'%(i,d),lambda x,p=i,d=d: self.prior_likelihood(p=p,**{'prior%d_lengthscale%d'%(p,d):x}),w,m))
 		samplers.extend(self._additionalSamplers())
 
 		SamplerContainer.__init__(self,samplers,**kwargs)
+
+	def checkDesignMatrix(self,):
+
+		if not self.designMatrix.shape[0] == self.y.shape[1]:
+			raise ValueError('designMatrix and y must have matching number of elements!')
+
+		if self.f > np.linalg.matrix_rank(self.designMatrix):
+			raise ValueError("design matrix is of rank %d, but there are %d functions!"
+							%(np.linalg.matrix_rank(self.designMatrix),self.f))
+
+	def checkPriors(self):
+		for p in self.priors:
+			p.setBase(self)
+
+		coverage = [False]*self.f
+
+		for p in self.priors:
+			for f in p.functions():
+				if coverage[f]:
+					raise ValueError("multiple priors supplied for function %d!"%f)
+				coverage[f] = True
+
+		if not all(coverage):
+			missing = np.where(~np.array(coverage))[0]
+			raise ValueError("Missing prior for functions %s!"%",".join(missing))
+
+
+	# def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,*args,**kwargs):
+	# 	""" Construct the base functional model.
+	#
+	# 	Args:
+	# 		x: np.array (n x p), independent variables (not the design matrix!),
+	# 			where obesrvations have been made
+	# 		y: np.array (n x r), funtion observations
+	# 	"""
+	#
+	# 	self.x = x # independent variables
+	# 	self.y = y # dependent variables
+	#
+	# 	# this list will hold the strings representing the values where
+	# 	# functions are to be sampled, e.g. x_1, x_2, ...
+	# 	self._observationIndexBaseList = None
+	#
+	# 	self.n = self.x.shape[0]
+	# 	assert self.y.shape[0] == self.n, 'x and y must have same first dimension shape!'
+	# 	self.p = self.x.shape[1]
+	# 	self.m = self.y.shape[1]
+	#
+	# 	self.designMatrix = None
+	# 	self.buildDesignMatrix()
+	#
+	# 	# number of functions being estimated
+	# 	self.f = self.designMatrix.shape[1]
+	#
+	# 	if self.f > np.linalg.matrix_rank(self.designMatrix):
+	# 		logger = logging.getLogger(__name__)
+	# 		logger.error("design matrix is of rank %d, but there are %d functions!"%(np.linalg.matrix_rank(self.designMatrix),self.f))
+	#
+	# 	# if np.any(np.isnan(self.y)):
+	# 	# 	logger = logging.getLogger(__name__)
+	# 	# 	logger.error("NaN values in observation matrix, this is not supported yet!")
+	#
+	# 	# kernel and sampler
+	# 	self.y_k = White(self,['y_sigma'],logspace=True)
+	# 	w,m = .1,10
+	# 	if 'y_sigma' in hyperparam_kwargs:
+	# 		w,m = hyperparam_kwargs['y_sigma']
+	# 	elif 'sigma' in hyperparam_kwargs:
+	# 		w,m = hyperparam_kwargs['sigma']
+	# 	samplers = [Slice('y_sigma','y_sigma',self.observationLikelihood,w,m)]
+	#
+	# 	# function priors
+	# 	self.kernels = []
+	# 	fxn_names = self.functionNames()
+	# 	for i,p in enumerate(self.priorGroups()):
+	# 		self.kernels.append(RBF(self,['prior%d_sigma'%i]+['prior%d_lengthscale%d'%(i,d) for d in range(self.p)],logspace=True))
+	#
+	# 		for f in p:
+	# 			if f in fxn_names:
+	# 				s = fxn_names[f]
+	# 			else:
+	# 				s = "f%d"%f
+	# 			samplers.append(Function('%s'%s,self.functionIndex(f),self,f,self.kernels[-1]))
+	#
+	# 			if derivatives:
+	# 				for d in range(self.p):
+	# 					samplers.append(FunctionDerivative('d%s'%s,d,self.functionIndex(f,derivative=True),self,f,self.kernels[-1]))
+	#
+	# 		w,m = .1,10
+	# 		if 'sigma' in hyperparam_kwargs:
+	# 			w,m = hyperparam_kwargs['sigma']
+	# 		samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p,x),w,m))
+	#
+	# 		w,m = .1,10
+	# 		if 'lengthscale' in hyperparam_kwargs:
+	# 			w,m = hyperparam_kwargs['lengthscale']
+	#
+	# 		for d in range(self.p):
+	# 			samplers.append(Slice('prior%d_lengthscale%d'%(i,d),'prior%d_lengthscale%d'%(i,d),lambda x,p=i,d=d: self.prior_likelihood(p=p,**{'prior%d_lengthscale%d'%(p,d):x}),w,m))
+	# 	samplers.extend(self._additionalSamplers())
+	#
+	# 	SamplerContainer.__init__(self,samplers,**kwargs)
 
 	def _additionalSamplers(self):
 		"""Additional samplers for the model, can be overwritten by subclasses."""
@@ -103,8 +166,8 @@ class Base(SamplerContainer):
 		return {}
 
 	def buildDesignMatrix(self):
-		if self.design_matrix is None:
-			self.design_matrix = self._buildDesignMatrix()
+		if self.designMatrix is None:
+			self.designMatrix = self._buildDesignMatrix()
 
 	def _buildDesignMatrix(self):
 		"""Build a design matrix defining the relation between observations and underlying functions.
@@ -182,14 +245,14 @@ class Base(SamplerContainer):
 		return self.parameter_history[self.functionIndex(f,*args,**kwargs)]
 
 	def residual(self,remove=[],only=[]):
-		return self.y.T - np.dot(self.design_matrix,self.functionMatrix(remove,only).T)
+		return self.y.T - np.dot(self.designMatrix,self.functionMatrix(remove,only).T)
 
 	def functionResidual(self,f):
 		"""compute the residual Y-Mb, without the function f."""
 		resid = self.residual(remove=[f])
 
-		resid = (resid.T / self.design_matrix[:,f].T).T
-		resid = resid[self.design_matrix[:,f]!=0,:]
+		resid = (resid.T / self.designMatrix[:,f].T).T
+		resid = resid[self.designMatrix[:,f]!=0,:]
 
 		return resid
 
@@ -199,7 +262,7 @@ class Base(SamplerContainer):
 
 	def observationMean(self):
 		"""The *conditional* mean of the observations given all functions"""
-		return np.dot(self.design_matrix,self.functionMatrix().T).ravel()
+		return np.dot(self.designMatrix,self.functionMatrix().T).ravel()
 
 	def observationLikelihood(self,sigma=None):
 		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
@@ -264,6 +327,6 @@ class Base(SamplerContainer):
 			samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
 		## put into data
-		y = np.dot(self.design_matrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
+		y = np.dot(self.designMatrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
 
 		return y.T,samples.T
