@@ -35,13 +35,13 @@ class Base(SamplerContainer):
 		# functions are to be sampled, e.g. x_1, x_2, ...
 		self._observationIndexBaseList = None
 
-		self.y_k = White(self,['y_sigma'],logspace=True)
+		self.y_k = White(self,['ySigma'],logspace=True)
 		w,m = .1,10
-		# if 'y_sigma' in hyperparam_kwargs:
-		# 	w,m = hyperparam_kwargs['y_sigma']
+		# if 'ySigma' in hyperparam_kwargs:
+		# 	w,m = hyperparam_kwargs['ySigma']
 		# elif 'sigma' in hyperparam_kwargs:
 		# 	w,m = hyperparam_kwargs['sigma']
-		samplers = [Slice('y_sigma','y_sigma',self.observationLikelihood,w,m)]
+		samplers = [Slice('ySigma','ySigma',self.observationLikelihood,w,m)]
 
 		for p in self.priors:
 			samplers.extend(p.samplers())
@@ -112,13 +112,13 @@ class Base(SamplerContainer):
 	# 	# 	logger.error("NaN values in observation matrix, this is not supported yet!")
 	#
 	# 	# kernel and sampler
-	# 	self.y_k = White(self,['y_sigma'],logspace=True)
+	# 	self.y_k = White(self,['ySigma'],logspace=True)
 	# 	w,m = .1,10
-	# 	if 'y_sigma' in hyperparam_kwargs:
-	# 		w,m = hyperparam_kwargs['y_sigma']
+	# 	if 'ySigma' in hyperparam_kwargs:
+	# 		w,m = hyperparam_kwargs['ySigma']
 	# 	elif 'sigma' in hyperparam_kwargs:
 	# 		w,m = hyperparam_kwargs['sigma']
-	# 	samplers = [Slice('y_sigma','y_sigma',self.observationLikelihood,w,m)]
+	# 	samplers = [Slice('ySigma','ySigma',self.observationLikelihood,w,m)]
 	#
 	# 	# function priors
 	# 	self.kernels = []
@@ -209,7 +209,7 @@ class Base(SamplerContainer):
 
 	def _priorParameters(self,i):
 		if i < 0:
-			return ['y_sigma']
+			return ['ySigma']
 		if i >= len(self.priorGroups()):
 			return [None]
 
@@ -276,44 +276,44 @@ class Base(SamplerContainer):
 
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
-	def prior_likelihood(self,p,*args,**kwargs):
-		"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
-
-		ind = self.priorGroups()[p]
-
-		mu = np.zeros(self.n)
-		cov = self.kernels[p].K(self.x,*args,**kwargs)
-		# cov += cov.mean()*np.eye(self.n)*1e-6
-
-		# use cholesky jitter code to find PD covariance matrix
-		diagA = np.diag(cov)
-		if np.any(diagA <= 0.):
-			raise linalg.LinAlgError("not pd: non-positive diagonal elements")
-		jitter = diagA.mean() * 1e-6
-		num_tries = 1
-		maxtries=10
-		while num_tries <= maxtries and np.isfinite(jitter):
-			try:
-				rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
-				break
-			except:
-				jitter *= 10
-			finally:
-				num_tries += 1
-
-		# rv = scipy.stats.multivariate_normal(mu,cov)
-
-		ll = 1
-		for f in ind:
-			try:
-				ll += rv.logpdf(self.parameter_cache[self.functionIndex(f)])
-			except np.linalg.LinAlgError:
-				logger = logging.getLogger(__name__)
-				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
-
-		# print "prior_likelihood (%d): %s"%(p,str(kwargs)),ll
-
-		return ll
+	# def prior_likelihood(self,p,*args,**kwargs):
+	# 	"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
+	#
+	# 	ind = self.priorGroups()[p]
+	#
+	# 	mu = np.zeros(self.n)
+	# 	cov = self.kernels[p].K(self.x,*args,**kwargs)
+	# 	# cov += cov.mean()*np.eye(self.n)*1e-6
+	#
+	# 	# use cholesky jitter code to find PD covariance matrix
+	# 	diagA = np.diag(cov)
+	# 	if np.any(diagA <= 0.):
+	# 		raise linalg.LinAlgError("not pd: non-positive diagonal elements")
+	# 	jitter = diagA.mean() * 1e-6
+	# 	num_tries = 1
+	# 	maxtries=10
+	# 	while num_tries <= maxtries and np.isfinite(jitter):
+	# 		try:
+	# 			rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
+	# 			break
+	# 		except:
+	# 			jitter *= 10
+	# 		finally:
+	# 			num_tries += 1
+	#
+	# 	# rv = scipy.stats.multivariate_normal(mu,cov)
+	#
+	# 	ll = 1
+	# 	for f in ind:
+	# 		try:
+	# 			ll += rv.logpdf(self.parameter_cache[self.functionIndex(f)])
+	# 		except np.linalg.LinAlgError:
+	# 			logger = logging.getLogger(__name__)
+	# 			logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
+	#
+	# 	# print "prior_likelihood (%d): %s"%(p,str(kwargs)),ll
+	#
+	# 	return ll
 
 	def samplePrior(self,):
 
@@ -321,12 +321,14 @@ class Base(SamplerContainer):
 
 		## sample the latent functions
 		samples = np.zeros((self.f,self.n))
-		for i in range(self.f):
-			mu = np.zeros(self.n)
-			cov = self.kernels[self.functionPrior(i)].K(self.x)
-			samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
+		for p in self.priors:
+			samples += p.sample()
+		# for i in range(self.f):
+		# 	mu = np.zeros(self.n)
+		# 	cov = self.kernels[self.functionPrior(i)].K(self.x)
+		# 	samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
 		## put into data
-		y = np.dot(self.designMatrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
+		y = np.dot(self.designMatrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['ySigma'])),size=(self.m,self.n))
 
 		return y.T,samples.T

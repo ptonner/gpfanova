@@ -1,4 +1,4 @@
-import base
+import base, linalg, scipy
 from kernel import RBF
 from sample import Slice, Function, FunctionDerivative
 import numpy as np
@@ -35,7 +35,7 @@ class Prior(object):
 		w,m = .1,10
 		samplers = []
 		for p in self.kernel.parameters:
-			samplers.append(Slice(p,p,lambda x: self.loglikelihood(p=x),w,m))
+			samplers.append(Slice(p,p,lambda x: self.loglikelihood(**{p:x}),w,m))
 
 		return samplers
 
@@ -50,28 +50,55 @@ class Prior(object):
 	def functions(self):
 		return self._functions
 
+	def sample(self):
+		"""Sample functions from this prior."""
+		samples = np.zeros((self.base.f,self.base.n))
+
+		for f in self._functions:
+
+			mu = np.zeros(self.base.n)
+			cov = self.kernel.K(self.base.x)
+			L = linalg.jitchol(cov)
+			cov = np.dot(L,L.T)
+
+			samples[f,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+		return samples
+
 	def loglikelihood(self,*args,**kwargs):
 		mu = np.zeros(self.base.n)
 		cov = self.kernel.K(self.base.x,*args,**kwargs)
 
-		# use cholesky jitter code to find PD covariance matrix
-		diagA = np.diag(cov)
-		if np.any(diagA <= 0.):
-			raise linalg.LinAlgError("not pd: non-positive diagonal elements")
-		jitter = diagA.mean() * 1e-6
-		num_tries = 1
-		maxtries=10
-		while num_tries <= maxtries and np.isfinite(jitter):
-			print 'jitter'
-			try:
-				rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
-				break
-			except:
-				jitter *= 10
-			finally:
-				num_tries += 1
+		L = linalg.jitchol(cov)
+		cov = np.dot(L,L.T)
 
-		ll = 1
+		# use cholesky jitter code to find PD covariance matrix
+		# diagA = np.diag(cov)
+		# if np.any(diagA <= 0.):
+		# 	from scipy import linalg
+		# 	raise linalg.LinAlgError("not pd: non-positive diagonal elements")
+		# jitter = diagA.mean() * 1e-6
+		# num_tries = 1
+		# maxtries=10
+		# rv = None
+		# while num_tries <= maxtries and np.isfinite(jitter):
+		# 	print 'jitter'
+		# 	try:
+		# 		rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
+		# 		break
+		# 	except:
+		# 		jitter *= 10
+		# 	finally:
+		# 		num_tries += 1
+
+		try:
+			rv = scipy.stats.multivariate_normal(mu,cov)
+		except np.linalg.LinAlgError,e:
+			print args
+			print kwargs
+			raise e
+
+		ll = 0
 		for f in self._functions:
 			try:
 				ll += rv.logpdf(self.base.get(self.base.functionIndex(f)))
