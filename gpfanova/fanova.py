@@ -1,4 +1,5 @@
 from base import Base
+from prior import Prior
 from sample import Transform
 import numpy as np
 from patsy.contrasts import Helmert
@@ -28,7 +29,11 @@ class FANOVA(Base):
 					self.projectionMatrices[(j,i)] = self._projectionMatrix(j,i)
 		self._effectInteractionIndex = {} # starting index for each interaction in function matrix
 
-		Base.__init__(self,x,y,*args,**kwargs)
+		priors = []
+		for ind,name in self.priorGroups():
+			priors.append(Prior(ind,name))
+
+		Base.__init__(self,x,y,priors=priors,*args,**kwargs)
 
 	def hasInteraction(self,i,k):
 		return self.interactions
@@ -186,6 +191,19 @@ class FANOVA(Base):
 
 		return fxn_names
 
+	def priorName(self,k,i=None,contrast=False,finiteVariance=False):
+		s = ""
+		if contrast:
+			s = "*"
+
+		if i is None:
+			return "%s%s" % (self.effectSuffix(k),s)
+
+		if i < k:
+			return self.effectName(i,k,contrast,finiteVariance)
+
+		"(%s,%s)%s" % (self.effectSuffix(k),self.effectSuffix(i),s)
+
 	def effectName(self,k,l,i=None,j=None,contrast=False,finiteVariance=False):
 		s = ""
 		if contrast:
@@ -256,18 +274,18 @@ class FANOVA(Base):
 		# 			(j-1)*(self.mk[k]-1) + l
 
 	def priorGroups(self):
-		g = [[0]]
+		g = [([0],'Mean')]
 
 		ind = 1
 		for i in range(self.k):
-			g.append(range(ind,ind+self.mk[i]-1))
+			g.append((range(ind,ind+self.mk[i]-1),self.priorName(i,contrast=True)))
 			ind += self.mk[i]-1
 
 		for i in range(self.k):
 			for k in range(i+1,self.k):
 				if self.hasInteraction(i,k):
 					c = (self.mk[i]-1) * (self.mk[k]-1)
-					g.append(range(ind,ind+c))
+					g.append((range(ind,ind+c),self.priorName(i,k,contrast=True)))
 					ind += c
 
 		return g
@@ -281,6 +299,8 @@ class FANOVA(Base):
 					d += (self.mk[i] - 1) * (self.mk[j] - 1)
 
 		x = np.zeros((self.m,d))
+
+		# mean
 		x[:,0] = 1
 
 		for s in range(self.m):
