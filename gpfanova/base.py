@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,designMatrix,priors,derivatives=False,*args,**kwargs):
+	def __init__(self,x,y,designMatrix=None,priors=None,derivatives=False,*args,**kwargs):
 		self.x = x
 		self.y = y
 
@@ -25,10 +25,9 @@ class Base(SamplerContainer):
 		self.derivatives = derivatives
 
 		self.designMatrix = designMatrix
-		self.f = self.designMatrix.shape[1]
-		self.priors = priors
-
 		self.checkDesignMatrix()
+
+		self.priors = priors
 		self.checkPriors()
 
 		# this list will hold the strings representing the values where
@@ -51,6 +50,10 @@ class Base(SamplerContainer):
 		SamplerContainer.__init__(self,samplers,**kwargs)
 
 	def checkDesignMatrix(self,):
+		# use built-in design matrix contstruction if none provided
+		self.buildDesignMatrix()
+
+		self.f = self.designMatrix.shape[1]
 
 		if not self.designMatrix.shape[0] == self.y.shape[1]:
 			raise ValueError('designMatrix and y must have matching number of elements!')
@@ -269,6 +272,7 @@ class Base(SamplerContainer):
 		y = np.ravel(self.y.T)
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
+		sigma = pow(sigma,.5)
 
 		# remove missing values
 		mu = mu[~np.isnan(y)]
