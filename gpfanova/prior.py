@@ -91,12 +91,13 @@ class Prior(object):
 		# 	finally:
 		# 		num_tries += 1
 
-		try:
-			rv = scipy.stats.multivariate_normal(mu,cov)
-		except np.linalg.LinAlgError,e:
-			print args
-			print kwargs
-			raise e
+		# try:
+		# 	rv = scipy.stats.multivariate_normal(mu,cov)
+		# except np.linalg.LinAlgError,e:
+		# 	print args
+		# 	print kwargs
+		# 	raise e
+		rv = scipy.stats.multivariate_normal(mu,cov)
 
 		ll = 0
 		for f in self._functions:
