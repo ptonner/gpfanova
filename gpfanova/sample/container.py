@@ -9,6 +9,9 @@ class SamplerContainer(object):
 		self.samplers = [a for a in samplers if issubclass(type(a),Sampler)]
 		self.sampler_dict = {a.name:a for a in self.samplers}
 
+		for s in self.samplers:
+			s.setContainer(self)
+
 		ind = self.build_index()
 		self.parameter_cache = pd.Series([0.0]*len(ind),index=ind)
 		self.parameter_history = pd.DataFrame(columns=ind)
@@ -26,6 +29,12 @@ class SamplerContainer(object):
 
 		return ind
 
+	def get(self,param,history=None):
+		if history is None:
+			return self.parameter_cache[param]
+		else:
+			return self.parameter_history.loc[history,param]
+
 	def _sample(self,random=False):
 
 		logger = logging.getLogger(__name__)
@@ -39,17 +48,18 @@ class SamplerContainer(object):
 
 			logger.debug('sampling %s'%str(sampler))
 
-			args = []
-			if sampler.current_param_dependent:
-				param = self.parameter_cache[sampler.parameters]
-
-				# just use the parameter value if length one
-				if len(sampler.parameters) == 1:
-					param = param[0]
-
-				args += [param]
-
-			sample = sampler.sample(*args)
+			# args = []
+			# if sampler.current_param_dependent:
+			# 	param = self.parameter_cache[sampler.parameters]
+			#
+			# 	# just use the parameter value if length one
+			# 	if len(sampler.parameters) == 1:
+			# 		param = param[0]
+			#
+			# 	args += [param]
+			#
+			# sample = sampler.sample(*args)
+			sample = sampler.sample()
 			self.parameter_cache[sampler.parameters] = sample
 
 	def sample(self,n=1,thin=0,verbose=False,random=False):

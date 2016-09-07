@@ -1,5 +1,5 @@
 from patsy.contrasts import Sum
-from sample import SamplerContainer, Gibbs, Slice, Fixed, Function, FunctionDerivative
+from sample import SamplerContainer, Slice, Fixed, Function, FunctionDerivative
 from kernel import RBF, White
 import numpy as np
 import scipy.stats, logging
@@ -25,7 +25,8 @@ class Base(SamplerContainer):
 		self.x = x # independent variables
 		self.y = y # dependent variables
 
-		# initialize the base index list
+		# this list will hold the strings representing the values where
+		# functions are to be sampled, e.g. x_1, x_2, ...
 		self._observationIndexBaseList = None
 
 		self.n = self.x.shape[0]
@@ -60,7 +61,7 @@ class Base(SamplerContainer):
 		self.kernels = []
 		fxn_names = self.functionNames()
 		for i,p in enumerate(self.priorGroups()):
-			self.kernels.append(RBF(self,['prior%d_sigma'%i,'prior%d_lengthscale'%i],logspace=True))
+			self.kernels.append(RBF(self,['prior%d_sigma'%i]+['prior%d_lengthscale%d'%(i,d) for d in range(self.p)],logspace=True))
 
 			for f in p:
 				if f in fxn_names:
@@ -70,17 +71,20 @@ class Base(SamplerContainer):
 				samplers.append(Function('%s'%s,self.functionIndex(f),self,f,self.kernels[-1]))
 
 				if derivatives:
-					samplers.append(FunctionDerivative('d%s'%s,self.functionIndex(f,derivative=True),self,f,self.kernels[-1]))
+					for d in range(self.p):
+						samplers.append(FunctionDerivative('d%s'%s,d,self.functionIndex(f,derivative=True),self,f,self.kernels[-1]))
 
 			w,m = .1,10
 			if 'sigma' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['sigma']
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p=p,sigma=x),w,m))
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p,x),w,m))
 
 			w,m = .1,10
 			if 'lengthscale' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['lengthscale']
-			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x),w,m))
+
+			for d in range(self.p):
+				samplers.append(Slice('prior%d_lengthscale%d'%(i,d),'prior%d_lengthscale%d'%(i,d),lambda x,p=i,d=d: self.prior_likelihood(p=p,**{'prior%d_lengthscale%d'%(p,d):x}),w,m))
 		samplers.extend(self._additionalSamplers())
 
 		SamplerContainer.__init__(self,samplers,**kwargs)
@@ -146,7 +150,7 @@ class Base(SamplerContainer):
 		if i >= len(self.priorGroups()):
 			return [None]
 
-		return ['prior%d_sigma'%i,'prior%d_lengthscale'%i]
+		return ['prior%d_sigma'%i]+['prior%d_lengthscale%d'%(i,d) for d in range(self.p)]
 
 	def functionMatrix(self,remove=[],only=[],derivative=False):
 		"""return the current function values, stored in the parameter_cache."""
@@ -203,17 +207,38 @@ class Base(SamplerContainer):
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
 
+		# remove missing values
+		mu = mu[~np.isnan(y)]
+		y = y[~np.isnan(y)]
+
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
-	def prior_likelihood(self,p,sigma=None,lengthscale=None):
+	def prior_likelihood(self,p,*args,**kwargs):
 		"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
+
 		ind = self.priorGroups()[p]
 
 		mu = np.zeros(self.n)
-		cov = self.kernels[p].K(self.x,sigma,lengthscale)
-		cov += cov.mean()*np.eye(self.n)*1e-6
+		cov = self.kernels[p].K(self.x,*args,**kwargs)
+		# cov += cov.mean()*np.eye(self.n)*1e-6
 
-		rv = scipy.stats.multivariate_normal(mu,cov)
+		# use cholesky jitter code to find PD covariance matrix
+		diagA = np.diag(cov)
+		if np.any(diagA <= 0.):
+			raise linalg.LinAlgError("not pd: non-positive diagonal elements")
+		jitter = diagA.mean() * 1e-6
+		num_tries = 1
+		maxtries=10
+		while num_tries <= maxtries and np.isfinite(jitter):
+			try:
+				rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
+				break
+			except:
+				jitter *= 10
+			finally:
+				num_tries += 1
+
+		# rv = scipy.stats.multivariate_normal(mu,cov)
 
 		ll = 1
 		for f in ind:
@@ -222,6 +247,9 @@ class Base(SamplerContainer):
 			except np.linalg.LinAlgError:
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
+
+		# print "prior_likelihood (%d): %s"%(p,str(kwargs)),ll
+
 		return ll
 
 	def samplePrior(self,):

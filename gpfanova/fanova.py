@@ -46,11 +46,13 @@ class FANOVA(Base):
 			if self.effectTransforms:
 				for l in range(self.mk[k]):
 					ret.append(Transform('%s_%d'%(self.effectSuffix(k),l),
-											self.effectIndexToCache(k,l),
-											lambda k=k,l=l : self.effectSample(k,l)))
-				ret.append(Transform("%s_finiteSampleVariance"%self.effectSuffix(k),
-											self.fsvIndexToCache(k),
-											lambda k=k:self.finitePopulationVarianceSample(k)))
+											self.effectIndexToCache(k,l), self,
+											self.effectContrastIndex(k),self.contrasts[k][l,:]))
+											# lambda k=k,l=l : self.effectSample(k,l)))
+				# removed with new transform code, need to update
+				# ret.append(Transform("%s_finiteSampleVariance"%self.effectSuffix(k),
+				# 							self.fsvIndexToCache(k),
+				# 							lambda k=k:self.finitePopulationVarianceSample(k)))
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
@@ -59,12 +61,20 @@ class FANOVA(Base):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
 								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effectSuffix(k),self.effectSuffix(i),l,j),
-												self.effectIndexToCache(k,l,i,j),
-												lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
+												self.effectIndexToCache(k,l,i,j), self,
+												self.effectContrastIndex(k,i),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:]))
+												# lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
 
 		return ret
 
-	def effectContrastArray(self,i,k=None,deriv=False):
+	def effectContrastIndex(self,i,k=None):
+		"""return the indices of an effect's contrasts in the function matrix.
+
+		i: effect 1
+		k: effect 2 (optional)
+
+		if k is None, return the indices of effect i contrasts, otherwise the
+		indices of the effect (i,k) contrasts are returned"""
 
 		if k is None:
 			ind = range(self.effectIndex(i,0),self.effectIndex(i+1,0))
@@ -73,6 +83,10 @@ class FANOVA(Base):
 				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i,0,k+1,0))
 			else:
 				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i+1,0,k,0))
+		return ind
+
+	def effectContrastArray(self,i,k=None,deriv=False):
+		ind = self.effectContrastIndex(i,k)
 		return self.functionMatrix(only=ind)
 
 	def effectArray(self,i,k=None):
