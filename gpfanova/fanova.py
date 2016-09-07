@@ -62,7 +62,7 @@ class FANOVA(Base):
 							for j in range(self.mk[i]):
 								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effectSuffix(k),self.effectSuffix(i),l,j),
 												self.effectIndexToCache(k,l,i,j), self,
-												self.effectContrastIndex(k,i),self.contrasts_interaction[(i,k)][j*self.mk[k]+l,:]))
+												self.effectContrastIndex(k,i),self.contrasts_interaction[(k,i)][j*self.mk[k]+l,:]))
 												# lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
 
 		return ret
