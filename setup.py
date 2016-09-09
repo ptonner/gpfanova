@@ -38,7 +38,7 @@ setup(
   cmdclass = cmdclass,
   ext_modules=ext_modules,
 
-  version='0.1.8',
+  version='0.1.9',
   description='Functional ANOVA using Gaussian Process priors.',
   author='Peter Tonner',
   author_email='peter.tonner@duke.edu',
