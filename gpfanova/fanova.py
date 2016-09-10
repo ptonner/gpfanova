@@ -31,7 +31,7 @@ class FANOVA(Base):
 
 		priors = []
 		for ind,name in self.priorGroups():
-			priors.append(Prior(ind,name))
+			priors.append(Prior(ind,name=name))
 
 		Base.__init__(self,x,y,priors=priors,*args,**kwargs)
 
