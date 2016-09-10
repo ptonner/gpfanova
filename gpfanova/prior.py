@@ -1,34 +1,50 @@
 import base, linalg, scipy
-from kernel import RBF
+from kernel import RBF, Kernel
 from sample import Slice, Function, FunctionDerivative
 import numpy as np
 
 class Prior(object):
 
-	def __init__(self,functions,name=None):
+	def __init__(self,functions,name=None,kernel=None):
 		self._functions = functions
+		assert issubclass(type(self._functions),list), 'must provide a list of functions!'
+
+		try:
+			self._functions = [int(f) for f in self._functions]
+		except:
+			raise ValueError("must provide list of intergers for functions!")
+
+		self._kernelType = kernel
+		if not self._kernelType is None:
+			if not issubclass(self._kernelType,Kernel):
+				raise ValueError("Must provide valid kernel type, %s provided." % (str(self._kernelType)))
+
 		self.base = None
-		self.kernel = None
+		self.kernel = self.buildKernel
 		self.name = name
+		self._samplers = None
 
 	def buildKernel(self):
 
-		self.kernel = RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
+		return RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
 
-	def samplers(self,):
+	def samplers(self):
+		return self._samplers
+
+	def buildSamplers(self,):
 		if self.base is None:
 			raise AttributeError("this prior has not been initialized with its base class!")
 
-		self.samplers = []
+		samplers = []
 		for f in self._functions:
-			self.samplers.append(Function('%d'%f,self.base.functionIndex(f),self.base,f,self.kernel))
+			samplers.append(Function('%d'%f,self.base.functionIndex(f),self.base,f,self.kernel))
 
 			if self.base.derivatives:
 				for d in range(self.base.p):
-					self.samplers.append(FunctionDerivative('d%f'%f,d,self.base.functionIndex(f,derivative=True),self.base,f,self.kernel))
+					samplers.append(FunctionDerivative('d%f'%f,d,self.base.functionIndex(f,derivative=True),self.base,f,self.kernel))
 
-		self.samplers.extend(self.kernelSamplers())
-		return self.samplers
+		samplers.extend(self.kernelSamplers())
+		return samplers
 
 	def kernelSamplers(self):
 
@@ -45,7 +61,8 @@ class Prior(object):
 		if not isinstance(self.base,base.Base):
 			raise TypeError("Must provide an instance of base.Base!")
 
-		self.buildKernel()
+		self.kernel = self.buildKernel()
+		self._samplers = self.buildSamplers()
 
 	def functions(self):
 		return self._functions
@@ -72,31 +89,6 @@ class Prior(object):
 		L = linalg.jitchol(cov)
 		cov = np.dot(L,L.T)
 
-		# use cholesky jitter code to find PD covariance matrix
-		# diagA = np.diag(cov)
-		# if np.any(diagA <= 0.):
-		# 	from scipy import linalg
-		# 	raise linalg.LinAlgError("not pd: non-positive diagonal elements")
-		# jitter = diagA.mean() * 1e-6
-		# num_tries = 1
-		# maxtries=10
-		# rv = None
-		# while num_tries <= maxtries and np.isfinite(jitter):
-		# 	print 'jitter'
-		# 	try:
-		# 		rv = scipy.stats.multivariate_normal(mu,cov + np.eye(cov.shape[0]) * jitter)
-		# 		break
-		# 	except:
-		# 		jitter *= 10
-		# 	finally:
-		# 		num_tries += 1
-
-		# try:
-		# 	rv = scipy.stats.multivariate_normal(mu,cov)
-		# except np.linalg.LinAlgError,e:
-		# 	print args
-		# 	print kwargs
-		# 	raise e
 		rv = scipy.stats.multivariate_normal(mu,cov)
 
 		ll = 0
@@ -108,3 +100,15 @@ class Prior(object):
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
 
 		return ll
+
+def PriorList(object):
+
+	def __init__(self,*args):
+
+		self._priors = []
+		for p in args:
+			if issubclass(type(p),Prior):
+				self._priors.append(p)
+
+	def __getitem__(self,ind):
+		return self._priors[ind]
