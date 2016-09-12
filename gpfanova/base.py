@@ -3,6 +3,7 @@ from sample import SamplerContainer, Slice, Fixed, Function, FunctionDerivative
 from kernel import RBF, White
 import numpy as np
 import scipy.stats, logging
+from prior import Prior
 
 class Base(SamplerContainer):
 	"""Base for constructing functional models of the form $y(t) = X \times b(t)$
@@ -35,15 +36,14 @@ class Base(SamplerContainer):
 		self.designMatrix = designMatrix
 		self.checkDesignMatrix()
 
-		self.priors = priors
+		if priors is None:
+			priors = [(range(self.f),'mean')]
+		self.priors = self.buildPriors(priors)
 		self.checkPriors()
+		self.k = len(priors)
 
 		self.y_k = White(self,['ySigma'],logspace=True)
 		w,m = .1,10
-		# if 'ySigma' in hyperparam_kwargs:
-		# 	w,m = hyperparam_kwargs['ySigma']
-		# elif 'sigma' in hyperparam_kwargs:
-		# 	w,m = hyperparam_kwargs['sigma']
 		samplers = [Slice('ySigma','ySigma',self.observationLikelihood,w,m)]
 
 		for p in self.priors:
@@ -68,9 +68,19 @@ class Base(SamplerContainer):
 			raise ValueError("design matrix is of rank %d, but there are %d functions!"
 							%(np.linalg.matrix_rank(self.designMatrix),self.f))
 
+	def buildPriors(self,priors,kernel=None):
+		ret = []
+
+		for fxns,name in priors:
+			ret.append(Prior(fxns,name,\
+								self,self.p,self.derivatives,self.f,\
+								self.n,self.x,kernel=kernel))
+
+		return ret
+
 	def checkPriors(self):
-		for p in self.priors:
-			p.setBase(self)
+		# for p in self.priors:
+		# 	p.setBase(self)
 
 		coverage = [False]*self.f
 

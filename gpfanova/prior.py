@@ -5,7 +5,7 @@ import numpy as np
 
 class Prior(object):
 
-	def __init__(self,functions,name=None,kernel=None):
+	def __init__(self,functions,name,base,p,derivatives,f,n,x,kernel=None):
 		self._functions = functions
 		assert issubclass(type(self._functions),list), 'must provide a list of functions!'
 
@@ -19,28 +19,34 @@ class Prior(object):
 			if not issubclass(self._kernelType,Kernel):
 				raise ValueError("Must provide valid kernel type, %s provided." % (str(self._kernelType)))
 
-		self.base = None
-		self.kernel = self.buildKernel
+		self.base = base
+		self.p = p
+		self.derivatives = derivatives
+		self.f = f
+		self.n = n
+		self.x = x
 		self.name = name
-		self._samplers = None
+
+		self.kernel = self.buildKernel()
+		self._samplers = self.buildSamplers()
 
 	def buildKernel(self):
 
-		return RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
+		if self._kernelType is None:
+			return RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
+		return self._kernelType(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
 
 	def samplers(self):
 		return self._samplers
 
 	def buildSamplers(self,):
-		if self.base is None:
-			raise AttributeError("this prior has not been initialized with its base class!")
 
 		samplers = []
 		for f in self._functions:
 			samplers.append(Function('%d'%f,self.base.functionIndex(f),self.base,f,self.kernel))
 
-			if self.base.derivatives:
-				for d in range(self.base.p):
+			if self.derivatives:
+				for d in range(self.p):
 					samplers.append(FunctionDerivative('d%f'%f,d,self.base.functionIndex(f,derivative=True),self.base,f,self.kernel))
 
 		samplers.extend(self.kernelSamplers())
@@ -55,26 +61,17 @@ class Prior(object):
 
 		return samplers
 
-	def setBase(self,b):
-		self.base = b
-
-		if not isinstance(self.base,base.Base):
-			raise TypeError("Must provide an instance of base.Base!")
-
-		self.kernel = self.buildKernel()
-		self._samplers = self.buildSamplers()
-
 	def functions(self):
 		return self._functions
 
 	def sample(self):
 		"""Sample functions from this prior."""
-		samples = np.zeros((self.base.f,self.base.n))
+		samples = np.zeros((self.f,self.n))
 
 		for f in self._functions:
 
-			mu = np.zeros(self.base.n)
-			cov = self.kernel.K(self.base.x)
+			mu = np.zeros(self.n)
+			cov = self.kernel.K(self.x)
 			L = linalg.jitchol(cov)
 			cov = np.dot(L,L.T)
 
@@ -83,8 +80,8 @@ class Prior(object):
 		return samples
 
 	def loglikelihood(self,*args,**kwargs):
-		mu = np.zeros(self.base.n)
-		cov = self.kernel.K(self.base.x,*args,**kwargs)
+		mu = np.zeros(self.n)
+		cov = self.kernel.K(self.x,*args,**kwargs)
 
 		L = linalg.jitchol(cov)
 		cov = np.dot(L,L.T)

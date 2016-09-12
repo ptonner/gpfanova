@@ -29,11 +29,11 @@ class FANOVA(Base):
 					self.projectionMatrices[(j,i)] = self._projectionMatrix(j,i)
 		self._effectInteractionIndex = {} # starting index for each interaction in function matrix
 
-		priors = []
-		for ind,name in self.priorGroups():
-			priors.append(Prior(ind,name=name))
+		# priors = []
+		# for ind,name in self.priorGroups():
+		# 	priors.append(Prior(ind,name=name))
 
-		Base.__init__(self,x,y,priors=priors,*args,**kwargs)
+		Base.__init__(self,x,y,priors=self.priorGroups(),*args,**kwargs)
 
 	def hasInteraction(self,i,k):
 		return self.interactions

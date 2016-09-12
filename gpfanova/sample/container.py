@@ -48,17 +48,6 @@ class SamplerContainer(object):
 
 			logger.debug('sampling %s'%str(sampler))
 
-			# args = []
-			# if sampler.current_param_dependent:
-			# 	param = self.parameter_cache[sampler.parameters]
-			#
-			# 	# just use the parameter value if length one
-			# 	if len(sampler.parameters) == 1:
-			# 		param = param[0]
-			#
-			# 	args += [param]
-			#
-			# sample = sampler.sample(*args)
 			sample = sampler.sample()
 			self.parameter_cache[sampler.parameters] = sample
 
