@@ -62,7 +62,7 @@ class SamplerContainer(object):
 			sample = sampler.sample()
 			self.parameter_cache[sampler.parameters] = sample
 
-	def sample(self,n=1,thin=0,verbose=False,random=False):
+	def sample(self,n=1,thin=0,verbose=False,random=False,save=None):
 		logger = logging.getLogger(__name__)
 		start = self.parameter_history.shape[0]
 		i = 1
@@ -79,6 +79,9 @@ class SamplerContainer(object):
 				j = self.parameter_history.shape[0] - start
 				logger.debug("%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60))
 				iter_time = time.time()
+
+				if not save is None:
+					self.save(save)
 
 			# i+=1
 
