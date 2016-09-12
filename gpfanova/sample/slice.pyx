@@ -2,6 +2,7 @@
 
 from . import Sampler
 import scipy
+import numpy as np
 
 class Slice(Sampler):
 	"""Slice sampling as described in Neal (2003), using the 'step-out' algorithm."""
@@ -17,9 +18,15 @@ class Slice(Sampler):
 			l,r: the final region bounds used
 		"""
 		Sampler.__init__(self,name,'Slice',parameters,current_param_dependent=True)
-		self.logdensity_fxn = logdensity_fxn
+		self._logdensity_fxn = logdensity_fxn
 		self.w = w
 		self.m = m
+
+	def logdensity_fxn(self,x):
+		try:
+			return self._logdensity_fxn(x)
+		except:
+			return -np.inf
 
 	def _sample(self,double x):
 

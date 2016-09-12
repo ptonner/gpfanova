@@ -21,7 +21,7 @@ class Function(Sampler):
 
 		# get the design matrix coefficient of each observtion for this function
 		# squared because it appears twice in the normal pdf exponential
-		n = np.power(self.base.design_matrix[:,self.f],2)
+		n = np.power(self.base.designMatrix[:,self.f],2)
 		n = n[n!=0]
 
 		missingValues = np.isnan(m)

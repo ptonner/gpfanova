@@ -10,7 +10,7 @@ class SamplerContainer(object):
 		self.sampler_dict = {a.name:a for a in self.samplers}
 
 		for s in self.samplers:
-			s.setContainer(self)
+			s._setContainer(self)
 
 		ind = self.build_index()
 		self.parameter_cache = pd.Series([0.0]*len(ind),index=ind)
