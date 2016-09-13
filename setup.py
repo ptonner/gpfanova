@@ -1,12 +1,11 @@
 # from distutils.core import setup
 from setuptools import setup, find_packages, Extension
 
+use_cython=True
 try:
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
 except ImportError:
-    use_cython = False
-else:
     use_cython = False
 
 cmdclass = { }
@@ -27,8 +26,6 @@ else:
 		Extension("gpfanova.kernel.rbf", ["gpfanova/kernel/rbf.c"]),
 		Extension("gpfanova.sample.slice", ["gpfanova/sample/slice.c"]),
     ]
-
-
 
 setup(
   name = 'gpfanova',
