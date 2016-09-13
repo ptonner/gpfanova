@@ -33,8 +33,8 @@ class Prior(object):
 	def buildKernel(self):
 
 		if self._kernelType is None:
-			return RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
-		return self._kernelType(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.base.p)],logspace=True)
+			return RBF(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.p)],logspace=True)
+		return self._kernelType(self.base,['prior%s_sigma'%self.name]+['prior%s_lengthscale%d'%(self.name,d) for d in range(self.p)],logspace=True)
 
 	def samplers(self):
 		return self._samplers
@@ -43,7 +43,7 @@ class Prior(object):
 
 		samplers = []
 		for f in self._functions:
-			samplers.append(Function('%d'%f,self.base.functionIndex(f),self.base,f,self.kernel))
+			samplers.append(Function('%d'%f,self.x,self.base,f,self.kernel))
 
 			if self.derivatives:
 				for d in range(self.p):
