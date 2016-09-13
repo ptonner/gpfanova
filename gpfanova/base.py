@@ -107,9 +107,9 @@ class Base(SamplerContainer):
 				function."""
 		return {}
 
-	def buildDesignMatrix(self):
-		if self.designMatrix is None:
-			self.designMatrix = self._buildDesignMatrix()
+	# def buildDesignMatrix(self):
+	# 	if self.designMatrix is None:
+	# 		self.designMatrix = self._buildDesignMatrix()
 
 	def _buildDesignMatrix(self):
 		"""Build a design matrix defining the relation between observations and underlying functions.
