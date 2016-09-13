@@ -5,11 +5,21 @@ from .. import linalg
 
 class Function(Sampler):
 
-	def __init__(self,name,parameters,base,f,kernel):
-		Sampler.__init__(self,name,'Function',parameters,current_param_dependent=False)
+	#def __init__(self,name,parameters,base,f,kernel):
+		#Sampler.__init__(self,name,'Function',parameters,current_param_dependent=False)
+
+	def __init__(self,name,x,base,f,kernel):
 		self.base = base
+		self.x = x
 		self.f = f
 		self.kernel = kernel
+
+		# if name is None:
+		# 	params = ['f%d(%s)'%(self.f,str(z)) for z in self.x]
+		# else:
+		params = ['%s(%s)'%(name,str(z)) for z in self.x]
+
+		Sampler.__init__(self,name,'Function',params,current_param_dependent=False)
 
 	def _sample(self):
 
@@ -32,8 +42,8 @@ class Function(Sampler):
 		# sum for computing the final covariance
 		n = np.sum(((~missingValues).T*n).T,0)
 
-		y_inv = self.base.y_k.K_inv(self.base.x)
-		f_inv = self.kernel.K_inv(self.base.x)
+		y_inv = self.base.y_k.K_inv(self.x)
+		f_inv = self.kernel.K_inv(self.x)
 
 		A = n*y_inv + f_inv
 		b = np.dot(y_inv,m)
