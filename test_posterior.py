@@ -1,5 +1,6 @@
 import unittest
-from gpfanova.sample.posterior import Parameter,Scalar,Vector,Sample, Posterior, Sampler, Identity, Offset
+from gpfanova.sample.posterior import Parameter, ParameterContainer,Scalar,Vector,Sample, Posterior, Sampler, Identity, Offset, Function, RBF
+import numpy as np
 
 class PosteriorTests(unittest.TestCase):
 
@@ -43,6 +44,42 @@ class PosteriorTests(unittest.TestCase):
         self.assertEquals(sub.test,0)
         self.assertEquals(sub.testIdent,0)
         self.assertEquals(sub.testOffset,10)
+
+    def test_functions(self):
+        f = 3
+        x = np.linspace(-1,1)
+        obs = np.random.normal(size=(50,f))
+        designMatrix = np.ones((50,f))
+
+        functionParams = ParameterContainer(*[Vector("f%d"%i,50) for i in range(f)])
+
+        kern = RBF(1)
+        obsKern = RBF(1)
+
+        for i in range(f):
+            fxn = Function(functionParams[i].name,designMatrix,x,functionParams.parameterList(names=True),kern,obsKern,obs)
+            self.post.addParameter(functionParams[i],fxn)
+
+        self.post.addParameter(Scalar('sigma',),Offset('sigma',1))
+        self.post.addParameter(Vector('lengthscale',),Identity('lengthscale'))
+        self.post.addSubscriber('sigma',kern)
+        self.post.addSubscriber('lengthscale',kern)
+        self.post.addSubscriber('sigma',obsKern)
+        self.post.addSubscriber('lengthscale',obsKern)
+
+        sample = self.post.buildSample()
+
+        for fxn in functionParams:
+            self.assertIn(fxn.name,sample.values)
+            self.assertIn(fxn.name,sample.parameters)
+            self.assertEquals(fxn.default,sample.values[fxn.name])
+
+        self.assertEquals(kern.sigma,sample.values['sigma'])
+        self.assertEquals(kern.lengthscale,sample.values['lengthscale'])
+
+        self.post.sample()
+        sample = self.post.samples[-1]
+
 
     def test_addParameter(self):
 

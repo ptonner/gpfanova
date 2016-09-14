@@ -1,4 +1,5 @@
-# from sampler import Sampler
+import scipy
+import numpy as np
 
 class Parameter(object):
 
@@ -13,7 +14,7 @@ class Scalar(Parameter):
 
 class Vector(Parameter):
 
-    def __init__(self,name,l,default=None):
+    def __init__(self,name,l=1,default=None):
         self.l=l
         if default is None:
             default = [0]*self.l
@@ -21,9 +22,18 @@ class Vector(Parameter):
 
 class ParameterContainer(object):
 
-    def parameterList(self):
+    def __init__(self,*params):
+        self.parameters = params
+
+    def __getitem__(self,key):
+        return self.parameters[key]
+
+    def parameterList(self,names=False):
         for k,v in self.parameters.iteritems():
-            yield v
+            if names:
+                yield v.name
+            else:
+                yield v
 
 class Sample(ParameterContainer):
 
@@ -63,6 +73,8 @@ class Sampler(object):
         self.type = _type
         self.depends = depends
 
+        self.depends = map(lambda x: x.name if issubclass(type(x),Parameter) else x,self.depends)
+
     def sample(self,*args):
         # kwargs = {}
         # for i,d in enumerate(self.depends):
@@ -95,6 +107,111 @@ class Offset(Sampler):
     def _sample(self,param):
         return param+self.offset
 
+class Function(Sampler):
+
+    @staticmethod
+    def functionMatrix(n,*fxns):
+        m = np.zeros((n,len(fxns)))
+        for i in range(len(fxns)):
+            m[:,i] = fxns[i]
+        return m
+
+    def __init__(self,name,designMatrix,x,fxns,kernel,obsKernel,obs):
+        self.name = name
+        if not self.name in fxns:
+            raise ValueError("this function must be in the provided list of functions!")
+
+        self.designMatrix = designMatrix
+        self.x = x
+        self.n = self.x.shape[0]
+
+        self.kernel = kernel
+        if not issubclass(type(self.kernel),Kernel):
+            raise TypeError('must provide an object of type kernel')
+
+        self.obsKernel = obsKernel
+        if not issubclass(type(self.obsKernel),Kernel):
+            raise TypeError('must provide an object of type kernel')
+
+        self.obs = obs
+
+        Sampler.__init__(self,'function',depends=fxns)
+
+        self.index = self.depends.index(self.name)
+
+    def residual(self,fm):
+        return self.obs.T - np.dot(self.designMatrix,fm.T)
+
+    def _sample(self,*fxns):
+
+        fm = Function.functionMatrix(self.n,*fxns)
+
+        m = self.residual(fm)
+
+        # in order to isolate the function f from the likelihood of each observation
+        # we have to divide by the design matrix coefficient, which leaves a
+        # multiplication to balance (which happens twice, e.g. squared).
+
+        # get the design matrix coefficient of each observtion for this function
+        # squared because it appears twice in the normal pdf exponential
+        n = np.power(self.base.designMatrix[:,self.index],2)
+        n = n[n!=0]
+
+        missingValues = np.isnan(m)
+
+        # scale each residual contribution by its squared dm coefficient
+        m = np.nansum((m.T*n).T,0)
+
+        # sum for computing the final covariance
+        n = np.sum(((~missingValues).T*n).T,0)
+
+        y_inv = self.obsKernel.K_inv(self.x)
+        f_inv = self.kernel.K_inv(self.x)
+
+        A = n*y_inv + f_inv
+        b = np.dot(y_inv,m)
+
+        # chol_A = np.linalg.cholesky(A)
+        chol_A = linalg.jitchol(A)
+        chol_A_inv = np.linalg.inv(chol_A)
+        A_inv = np.dot(chol_A_inv.T,chol_A_inv)
+
+        mu,cov = np.dot(A_inv,b), A_inv
+
+        return scipy.stats.multivariate_normal.rvs(mu,cov)
+
+class Kernel(object):
+
+    def __init__(self):
+        pass
+
+    def K(self,X):
+        raise NotImplemented("Implement this function for your kernel")
+
+class RBF(Kernel):
+
+    @staticmethod
+    def dist(X,lengthscales):
+
+        X = X/lengthscales
+
+        Xsq = np.sum(np.square(X),1)
+        r2 = -2.*np.dot(X, X.T) + Xsq[:,None] + Xsq[None,:]
+        r2 = np.clip(r2, 0, np.inf)
+        return np.sqrt(r2)
+
+    def __init__(self,p=1):
+        self.p = p
+        self.sigma = 0
+        self.lengthscale = [0]*self.p
+
+    def K(self,X):
+        sigma = np.exp(self.sigma)
+        lengthscale = np.array(map(np.exp,self.lengthscale))
+
+        dist = RBF.dist(X,lengthscale)
+        return sigma*np.exp(-.5*dist**2)
+
 class Posterior(ParameterContainer):
 
     def __init__(self):
@@ -115,11 +232,17 @@ class Posterior(ParameterContainer):
         self.parameters[p.name] = p
         self.samplers[p.name] = sampler
 
-    def addSubscriber(self,p,sub):
+    def addSubscriber(self,p,sub,nameMap=None):
+        if issubclass(type(p),Parameter):
+            p = p.name
+
+        if nameMap is None:
+            nameMap = p
+
         if p in self.subscriptions:
-            self.subscriptions[p].append(sub)
+            self.subscriptions[p].append((sub,nameMap))
         else:
-            self.subscriptions[p] = [sub]
+            self.subscriptions[p] = [(sub,nameMap)]
 
     def buildSample(self,n=0):
             return Sample(n,*self.parameterList())
@@ -160,11 +283,11 @@ class Posterior(ParameterContainer):
 
         if p is None:
             for p in self.subscriptions.keys():
-                for sub in self.subscriptions[p]:
+                for sub,nm in self.subscriptions[p]:
                     # sub.__setattr__(p,sample[p])
-                    sub.__dict__[p] = sample[p]
+                    sub.__dict__[nm] = sample[p]
         else:
             if p in self.subscriptions:
-                for sub in self.subscriptions[p]:
+                for sub,nm in self.subscriptions[p]:
                     # sub.__setattr__(p,sample[p])
-                    sub.__dict__[p] = sample[p]
+                    sub.__dict__[nm] = sample[p]
