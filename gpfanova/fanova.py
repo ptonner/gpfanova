@@ -1,5 +1,4 @@
 from base import Base
-from prior import Prior
 from sample import Transform
 import numpy as np
 from patsy.contrasts import Helmert
@@ -29,11 +28,7 @@ class FANOVA(Base):
 					self.projectionMatrices[(j,i)] = self._projectionMatrix(j,i)
 		self._effectInteractionIndex = {} # starting index for each interaction in function matrix
 
-		# priors = []
-		# for ind,name in self.priorGroups():
-		# 	priors.append(Prior(ind,name=name))
-
-		Base.__init__(self,x,y,priors=self.priorGroups(),*args,**kwargs)
+		Base.__init__(self,x,y,*args,**kwargs)
 
 	def hasInteraction(self,i,k):
 		return self.interactions
@@ -51,13 +46,11 @@ class FANOVA(Base):
 			if self.effectTransforms:
 				for l in range(self.mk[k]):
 					ret.append(Transform('%s_%d'%(self.effectSuffix(k),l),
-											self.effectIndexToCache(k,l), self,
-											self.effectContrastIndex(k),self.contrasts[k][l,:]))
-											# lambda k=k,l=l : self.effectSample(k,l)))
-				# removed with new transform code, need to update
-				# ret.append(Transform("%s_finiteSampleVariance"%self.effectSuffix(k),
-				# 							self.fsvIndexToCache(k),
-				# 							lambda k=k:self.finitePopulationVarianceSample(k)))
+											self.effectIndexToCache(k,l),
+											lambda k=k,l=l : self.effectSample(k,l)))
+				ret.append(Transform("%s_finiteSampleVariance"%self.effectSuffix(k),
+											self.fsvIndexToCache(k),
+											lambda k=k:self.finitePopulationVarianceSample(k)))
 
 		for k in range(self.k):
 			for i in range(k+1,self.k):
@@ -66,20 +59,12 @@ class FANOVA(Base):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
 								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effectSuffix(k),self.effectSuffix(i),l,j),
-												self.effectIndexToCache(k,l,i,j), self,
-												self.effectContrastIndex(k,i),self.contrasts_interaction[(k,i)][j*self.mk[k]+l,:]))
-												# lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
+												self.effectIndexToCache(k,l,i,j),
+												lambda k=k,l=l,i=i,j=j : self.effectSample(k,l,i,j)))
 
 		return ret
 
-	def effectContrastIndex(self,i,k=None):
-		"""return the indices of an effect's contrasts in the function matrix.
-
-		i: effect 1
-		k: effect 2 (optional)
-
-		if k is None, return the indices of effect i contrasts, otherwise the
-		indices of the effect (i,k) contrasts are returned"""
+	def effectContrastArray(self,i,k=None,deriv=False):
 
 		if k is None:
 			ind = range(self.effectIndex(i,0),self.effectIndex(i+1,0))
@@ -88,10 +73,6 @@ class FANOVA(Base):
 				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i,0,k+1,0))
 			else:
 				ind = range(self.effectInteractionIndex(i,0,k,0),self.effectInteractionIndex(i+1,0,k,0))
-		return ind
-
-	def effectContrastArray(self,i,k=None,deriv=False):
-		ind = self.effectContrastIndex(i,k)
 		return self.functionMatrix(only=ind)
 
 	def effectArray(self,i,k=None):
@@ -191,19 +172,6 @@ class FANOVA(Base):
 
 		return fxn_names
 
-	def priorName(self,k,i=None,contrast=False,finiteVariance=False):
-		s = ""
-		if contrast:
-			s = "*"
-
-		if i is None:
-			return "%s%s" % (self.effectSuffix(k),s)
-
-		if i < k:
-			return self.effectName(i,k,contrast,finiteVariance)
-
-		"(%s,%s)%s" % (self.effectSuffix(k),self.effectSuffix(i),s)
-
 	def effectName(self,k,l,i=None,j=None,contrast=False,finiteVariance=False):
 		s = ""
 		if contrast:
@@ -274,18 +242,18 @@ class FANOVA(Base):
 		# 			(j-1)*(self.mk[k]-1) + l
 
 	def priorGroups(self):
-		g = [([0],'Mean')]
+		g = [[0]]
 
 		ind = 1
 		for i in range(self.k):
-			g.append((range(ind,ind+self.mk[i]-1),self.priorName(i,contrast=True)))
+			g.append(range(ind,ind+self.mk[i]-1))
 			ind += self.mk[i]-1
 
 		for i in range(self.k):
 			for k in range(i+1,self.k):
 				if self.hasInteraction(i,k):
 					c = (self.mk[i]-1) * (self.mk[k]-1)
-					g.append((range(ind,ind+c),self.priorName(i,k,contrast=True)))
+					g.append(range(ind,ind+c))
 					ind += c
 
 		return g
@@ -299,8 +267,6 @@ class FANOVA(Base):
 					d += (self.mk[i] - 1) * (self.mk[j] - 1)
 
 		x = np.zeros((self.m,d))
-
-		# mean
 		x[:,0] = 1
 
 		for s in range(self.m):

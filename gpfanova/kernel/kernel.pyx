@@ -30,7 +30,7 @@ class Kernel(object):
 		# add any missing params from cache
 		while None in params:
 			i = params.index(None)
-			params[i] = self.model.get(self.parameters[i])
+			params[i] = self.model.parameter_cache[self.parameters[i]]
 
 		if self.logspace:
 			for i in range(len(params)):
