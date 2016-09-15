@@ -60,8 +60,6 @@ if __name__ == "__main__":
 							plates=['heatshock_12'])
 
 			import numpy as np
-
-			# columns: strain, ev, copr-vector
 			neweffects = np.zeros((5,3),dtype=int)
 			neweffects[labels.str.contains("VNG1179"),0] = 1
 			neweffects[labels.str.contains("copR"),0] = 1
@@ -123,5 +121,6 @@ if __name__ == "__main__":
 				m.parameter_cache = m.parameter_history.iloc[-1,:]
 
 				print nrestarts, e
+
 
 		m.save(os.path.join(resultsDir,'results/hsalTF/hsalTF%s.csv'%(s)))
