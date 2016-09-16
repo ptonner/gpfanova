@@ -214,7 +214,7 @@ class Base(SamplerContainer):
 		cov = self.kernels[p].K(self.x,sigma,lengthscale)
 		cov += cov.mean()*np.eye(self.n)*1e-6
 
-		priorRv = scipy.stats.uniform(prior_lb,prior_ub)
+		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
 		if lengthscale is None:
 			if sigma is None:
 				raise ValueError("must provide lengthscale or sigma in likelihood fxn")
