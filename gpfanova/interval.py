@@ -1,5 +1,60 @@
 import numpy as np
 
+class Interval(object):
+
+	def __init__(self,samples,alpha,ndim=1):
+		self.samples = samples
+		self.n = self.samples.shape[0]
+		self.alpha = alpha
+
+		if self.alpha < 0 or self.alpha > 1:
+			raise ValueError("must provide alpha between 0 and 1")
+
+		if self.samples.ndim != ndim:
+			raise ValueError("sample dimensions does not match %d"%ndim)
+
+	def contains(self,x):
+		raise NotImplemented("implement this for your interval!")
+
+class ScalarInterval(Interval):
+
+	def __init__(self,samples,alpha,pi):
+		Interval.__init__(self,samples,alpha,ndim=1)
+
+		# method for computing p(theta | data)
+		self.pi = pi
+
+		# compute the hpd interval
+		# Adapted from "Monte Carlo Estimation of Bayesian Credible and HPD Intervals", Ming-Hui Chen and Qi-Man Shao, 1999
+		self.epsilon = [self.pi(t) for t in self.samples]
+		self.epsilon.sort()
+		j = int(self.n*self.alpha)
+		self.epj = self.epsilon[j] # any observation with pi(x|D) > epj is in the region
+
+	def contains(self,x):
+		return self.pi(x) > self.epj
+
+	def plot(self,lims,x=None):
+
+		on = False
+		regs = []
+		for z in np.linspace(*lims):
+			if not on and self.contains(z):
+				on = True
+				start = z
+			elif on and not self.contains(z):
+				on = False
+				regs.append((start,z))
+
+		for r in regs:
+			plt.hlines(0,r[0],r[1],lw=30)
+
+		if not x is None:
+			plt.scatter(x,-.001,c='r',marker='x',s=50)
+		plt.yticks([])
+		plt.ylim(-.0015,.0005)
+
+
 def functionInterval(samples,start=1e-6,alpha=.95,tol=1e-6,maxiter=100):
 
 	# change alpha to be best possible given the number of samples
