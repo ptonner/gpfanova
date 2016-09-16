@@ -1,6 +1,7 @@
 from . import Sampler
 import scipy
 import numpy as np
+from .. import linalg
 
 class Function(Sampler):
 
@@ -29,7 +30,7 @@ class Function(Sampler):
 		#b = n*np.dot(y_inv,m)
 		b = np.dot(y_inv,m)
 
-		chol_A = np.linalg.cholesky(A)
+		chol_A = linalg.jitchol(A)
 		chol_A_inv = np.linalg.inv(chol_A)
 		A_inv = np.dot(chol_A_inv.T,chol_A_inv)
 
