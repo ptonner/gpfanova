@@ -36,6 +36,8 @@ class ScalarInterval(Interval):
 
 	def plot(self,lims,x=None):
 
+		import matplotlib.pyplot as plt
+
 		on = False
 		regs = []
 		for z in np.linspace(*lims):
