@@ -202,6 +202,7 @@ class Base(SamplerContainer):
 		y = np.ravel(self.y.T)
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
+		sigma = pow(sigma,.5)
 
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
