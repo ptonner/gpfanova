@@ -75,12 +75,12 @@ class Base(SamplerContainer):
 			w,m = .1,10
 			if 'sigma' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['sigma']
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p=p,sigma=x),w,m))
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p=p,sigma=x,prior_lb=-2,prior_ub=2),w,m))
 
 			w,m = .1,10
 			if 'lengthscale' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['lengthscale']
-			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x),w,m))
+			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x,prior_lb=-2,prior_ub=2),w,m))
 		samplers.extend(self._additionalSamplers())
 
 		SamplerContainer.__init__(self,samplers,**kwargs)
@@ -205,13 +205,22 @@ class Base(SamplerContainer):
 
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
 
-	def prior_likelihood(self,p,sigma=None,lengthscale=None):
+	def prior_likelihood(self,p,sigma=None,lengthscale=None,prior_ub=None,prior_lb=None):
 		"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
 		ind = self.priorGroups()[p]
 
 		mu = np.zeros(self.n)
 		cov = self.kernels[p].K(self.x,sigma,lengthscale)
 		cov += cov.mean()*np.eye(self.n)*1e-6
+
+		priorRv = scipy.stats.uniform(prior_lb,prior_ub)
+		if lengthscale is None:
+			if sigma is None:
+				raise ValueError("must provide lengthscale or sigma in likelihood fxn")
+			else:
+				priorll = priorRv.logpdf(sigma)
+		else:
+			priorll = priorRv.logpdf(lengthscale)
 
 		rv = scipy.stats.multivariate_normal(mu,cov)
 
@@ -222,7 +231,8 @@ class Base(SamplerContainer):
 			except np.linalg.LinAlgError:
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
-		return ll
+
+		return ll + priorll
 
 	def samplePrior(self,):
 
