@@ -1,6 +1,7 @@
 from gpfanova.interval import ScalarInterval, FunctionInterval
-import gpfanova
+import gpfanova, os
 import numpy as np
+import matplotlib.pyplot as plt
 
 class ConvergenceTest(object):
 
@@ -77,12 +78,13 @@ class ConvergenceTest(object):
 			ival = self.intervals[ind]
 			samples = self.m.functionSamples(ind).values
 
+			plt.figure()
 			plt.subplot(121)
 			gpfanova.plot.plotFunctionSamples(samples)
 			plt.plot(self.fsamples[:,ind],lw=3);
 
 			plt.subplot(122)
-			diff = samples - self.fsamples[:,f]
+			diff = samples - self.fsamples[:,ind]
 			cmap = plt.get_cmap("RdBu")
 			for i in range(diff.shape[0]):
 				plt.plot(abs(diff[i,:]),c=cmap(1.*i/diff.shape[0]));
@@ -92,13 +94,17 @@ class ConvergenceTest(object):
 
 if __name__ == "__main__":
 
-	cvg = ConvergenceTest()
+	cvg = ConvergenceTest('test')
+	
 	cvg.addScalarInterval('prior0_sigma',.05,lambda x: cvg.m.prior_likelihood(0,sigma=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior0_lengthscale',.05,lambda x: cvg.m.prior_likelihood(0,lengthscale=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior1_sigma',.05,lambda x: cvg.m.prior_likelihood(1,sigma=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior1_lengthscale',.05,lambda x: cvg.m.prior_likelihood(1,lengthscale=x,prior_lb=-2,prior_ub=2))
 
-	cvg.iterate(nsample=1000,y_sigma=-2)
+	cvg.addFunctionInterval(0,.95)
+	cvg.addFunctionInterval(1,.95)
+
+	cvg.iterate(nsample=1000,n=10,r=3,y_sigma=-2)
 
 	print cvg.results()
 
