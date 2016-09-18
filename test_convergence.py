@@ -23,7 +23,7 @@ class ConvergenceTest(object):
 		self.initialize(**kwargs)
 		self.permute(permutationFunction)
 		self.sample(**kwargs)
-		self.checkIntervals()
+		self.checkIntervals(**kwargs)
 
 		if plot:
 			self.plot()
@@ -64,15 +64,16 @@ class ConvergenceTest(object):
 	def addFunctionInterval(self,ind,alpha,*args,**kwargs):
 		self.functionIntervals.append((ind,alpha,args,kwargs))
 
-	def checkIntervals(self):
+	def checkIntervals(self,burnin=0,**_kwargs):
 		chex = []
 		for parameter,alpha,args,kwargs in self.scalarIntervals:
-			ival = ScalarInterval(self.m.parameterSamples(parameter).values[:,0],alpha,*args,**kwargs)
+			samples = self.m.parameterSamples(parameter).values[burnin:,0]
+			ival = ScalarInterval(samples,alpha,*args,**kwargs)
 			chex.append(ival.contains(self.trueValues[parameter]))
 			self.intervals[parameter] = ival
 
 		for ind,alpha,args,kwargs in self.functionIntervals:
-			ival = FunctionInterval(self.m.functionSamples(ind).values,alpha,*args,**kwargs)
+			ival = FunctionInterval(self.m.functionSamples(ind).values[burnin:,:],alpha,*args,**kwargs)
 			chex.append(ival.contains(self.trueValues[ind]))
 			self.intervals[ind] = ival
 
@@ -93,7 +94,8 @@ class ConvergenceTest(object):
 
 			plt.figure()
 			plt.subplot(121)
-			plt.plot(self.m.parameterSamples(parameter))
+			# plt.plot(self.m.parameterSamples(parameter))
+			plt.plot(ival.samples)
 			plt.subplot(122)
 			ival.plot((-2,2),self.trueValues[parameter])
 			plt.savefig(os.path.join('testing',self.label,str(self.iter),'%s.pdf'%parameter))
@@ -104,7 +106,8 @@ class ConvergenceTest(object):
 
 			plt.figure()
 			plt.subplot(121)
-			gpfanova.plot.plotFunctionSamples(samples)
+			# gpfanova.plot.plotFunctionSamples(samples)
+			gpfanova.plot.plotFunctionSamples(ival.samples)
 			plt.plot(self.fsamples[:,ind],lw=3);
 
 			plt.subplot(122)
@@ -141,7 +144,7 @@ if __name__ == "__main__":
 		return m
 
 	for i in range(3):
-		cvg.iterate(nsample=100,n=10,r=3,y_sigma=-2,plot=True,permutationFunction=permute)
+		cvg.iterate(nsample=100,thin=10,r=3,y_sigma=-2,plot=True,permutationFunction=permute,burnin=2)
 		# print cvg.results()
 
 	cvg.save()
