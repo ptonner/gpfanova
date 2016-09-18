@@ -54,7 +54,7 @@ class Base(SamplerContainer):
 			w,m = hyperparam_kwargs['y_sigma']
 		elif 'sigma' in hyperparam_kwargs:
 			w,m = hyperparam_kwargs['sigma']
-		samplers = [Slice('y_sigma','y_sigma',self.observationLikelihood,w,m)]
+		samplers = [Slice('y_sigma','y_sigma',lambda x: self.observationLikelihood(sigma=x,prior_lb=-2,prior_ub=2),w,m)]
 
 		# function priors
 		self.kernels = []
@@ -197,14 +197,17 @@ class Base(SamplerContainer):
 		"""The *conditional* mean of the observations given all functions"""
 		return np.dot(self.design_matrix,self.functionMatrix().T).ravel()
 
-	def observationLikelihood(self,sigma=None):
+	def observationLikelihood(self,sigma=None,prior_ub=None,prior_lb=None):
 		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
 		y = np.ravel(self.y.T)
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
 		sigma = pow(sigma,.5)
 
-		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma))
+		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
+		priorll = priorRv.logpdf(sigma)
+
+		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma)) + priorll
 
 	def prior_likelihood(self,p,sigma=None,lengthscale=None,prior_ub=None,prior_lb=None):
 		"""Compute the likelihood of functions with prior p, for the current/provided hyperparameters"""
