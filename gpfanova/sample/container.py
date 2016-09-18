@@ -67,7 +67,9 @@ class SamplerContainer(object):
 				self.store()
 
 				j = self.parameter_history.shape[0] - start
-				logger.debug("%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60))
+
+				if verbose:
+					logger.info("%d/%d iterations (%.2lf%s) finished in %.2lf minutes" % (j,n,100.*j/n,'%',(time.time()-start_time)/60))
 				iter_time = time.time()
 
 			# i+=1
