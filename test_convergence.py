@@ -2,6 +2,7 @@ from gpfanova.interval import ScalarInterval, FunctionInterval
 import gpfanova, os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 class ConvergenceTest(object):
 
@@ -13,19 +14,33 @@ class ConvergenceTest(object):
 		self.m = None
 		self.trueValues = {}
 		self.allChecks = []
+		self.iter = 0
 
-	def iterate(self,**kwargs):
+		if not self.label in os.listdir('testing'):
+			os.mkdir(os.path.join('testing',self.label))
+
+	def iterate(self,plot=False,permutationFunction=None,**kwargs):
 		self.initialize(**kwargs)
+		self.permute(permutationFunction)
 		self.sample(**kwargs)
 		self.checkIntervals()
+
+		if plot:
+			self.plot()
+
+		self.iter+=1
+
+	def permute(self,permutationFunction):
+		if not permutationFunction is None:
+			self.m = permutationFunction(self.m)
 
 	def results(self):
 		ac = np.array(self.allChecks)
 
-		return ac.sum(0)/ac.shape[0]
+		return 1.*ac.sum(0)/ac.shape[0]
 
 	def sample(self,nsample=100,thin=10,**kwargs):
-		self.m.sample(nsample,thin=thin)
+		self.m.sample(nsample,thin=thin,verbose=False)
 
 	def buildModel(self,k=2,r=5,n=50,**kwargs):
 		self.x = np.linspace(-1,1,n)[:,None]
@@ -63,16 +78,25 @@ class ConvergenceTest(object):
 
 		self.allChecks.append(chex)
 
+	def save(self):
+		cols = [parameter for parameter,_,_,_ in self.scalarIntervals] + [str(ind) for ind,_,_,_ in self.functionIntervals]
+		df = pd.DataFrame(self.allChecks,columns=cols)
+		df.to_csv(os.path.join('testing',self.label,'checks.csv'))
+
 	def plot(self):
+
+		if not str(self.iter) in os.listdir(os.path.join('testing',self.label)):
+			os.mkdir(os.path.join('testing',self.label,str(self.iter)))
+
 		for parameter,_,_,_ in self.scalarIntervals:
 			ival = self.intervals[parameter]
-			
+
 			plt.figure()
 			plt.subplot(121)
-			plt.plot(self.m.parameterSamples(parameter))    
+			plt.plot(self.m.parameterSamples(parameter))
 			plt.subplot(122)
 			ival.plot((-2,2),self.trueValues[parameter])
-			plt.savefig(os.path.join('testing',self.label,'%s.pdf'%parameter))
+			plt.savefig(os.path.join('testing',self.label,str(self.iter),'%s.pdf'%parameter))
 
 		for ind,_,_,_ in self.functionIntervals:
 			ival = self.intervals[ind]
@@ -89,13 +113,14 @@ class ConvergenceTest(object):
 			for i in range(diff.shape[0]):
 				plt.plot(abs(diff[i,:]),c=cmap(1.*i/diff.shape[0]));
 
-			plt.savefig(os.path.join('testing',self.label,'f%d.pdf'%ind))
+			plt.savefig(os.path.join('testing',self.label,str(self.iter),'f%d.pdf'%ind))
 
 
 if __name__ == "__main__":
 
-	cvg = ConvergenceTest('test')
-	
+	cvg = ConvergenceTest('test-singleEffect-2k')
+
+	cvg.addScalarInterval('y_sigma',.05,lambda x: cvg.m.observationLikelihood(sigma=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior0_sigma',.05,lambda x: cvg.m.prior_likelihood(0,sigma=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior0_lengthscale',.05,lambda x: cvg.m.prior_likelihood(0,lengthscale=x,prior_lb=-2,prior_ub=2))
 	cvg.addScalarInterval('prior1_sigma',.05,lambda x: cvg.m.prior_likelihood(1,sigma=x,prior_lb=-2,prior_ub=2))
@@ -104,8 +129,21 @@ if __name__ == "__main__":
 	cvg.addFunctionInterval(0,.95)
 	cvg.addFunctionInterval(1,.95)
 
-	cvg.iterate(nsample=1000,n=10,r=3,y_sigma=-2)
+	def permute(m):
+		m.parameter_cache['y_sigma'] = np.random.uniform(-1,1)
 
-	print cvg.results()
+		m.parameter_cache['prior0_sigma'] = np.random.uniform(-1,1)
+		m.parameter_cache['prior0_lengthscale'] = np.random.uniform(-1,1)
 
-	cvg.plot()
+		m.parameter_cache['prior1_sigma'] = np.random.uniform(-1,1)
+		m.parameter_cache['prior1_lengthscale'] = np.random.uniform(-1,1)
+
+		return m
+
+	for i in range(3):
+		cvg.iterate(nsample=100,n=10,r=3,y_sigma=-2,plot=True,permutationFunction=permute)
+		# print cvg.results()
+
+	cvg.save()
+
+	#cvg.plot()
