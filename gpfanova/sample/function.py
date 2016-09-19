@@ -20,8 +20,9 @@ class Function(Sampler):
 		# n = [np.power(self.base.design_matrix[i,self.f],2) for i in range(self.base.m)]
 		n = np.power(self.base.design_matrix[:,self.f],2)
 		n = n[n!=0]
-		m = np.sum((m.T*n).T,0)
-		n = np.sum(n)
+		missingValues = np.isnan(m)
+		m = np.nansum((m.T*n).T,0)
+		n = np.sum(((~missingValues).T*n).T,0)
 
 		y_inv = self.base.y_k.K_inv(self.base.x)
 		f_inv = self.kernel.K_inv(self.base.x)

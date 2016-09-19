@@ -45,7 +45,7 @@ class Base(SamplerContainer):
 
 		if np.any(np.isnan(self.y)):
 			logger = logging.getLogger(__name__)
-			logger.error("NaN values in observation matrix, this is not supported yet!")
+			logger.error("NaN values in observation matrix, this is not supported!")
 
 		# kernel and sampler
 		self.y_k = White(self,['y_sigma'],logspace=True)
@@ -203,6 +203,10 @@ class Base(SamplerContainer):
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
 		sigma = pow(sigma,.5)
+
+		# remove missing values
+		mu = mu[~np.isnan(y)]
+		y = y[~np.isnan(y)]
 
 		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
 		priorll = priorRv.logpdf(sigma)
