@@ -1,5 +1,5 @@
 from gpfanova.interval import ScalarInterval, FunctionInterval
-import gpfanova, os
+import gpfanova, os, gc
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,7 +19,7 @@ class ConvergenceTest(object):
 		if not self.label in os.listdir('testing'):
 			os.mkdir(os.path.join('testing',self.label))
 
-	def iterate(self,plot=False,permutationFunction=None,**kwargs):
+	def iterate(self,plot=False,save=False,permutationFunction=None,**kwargs):
 		self.initialize(**kwargs)
 		self.permute(permutationFunction)
 		self.sample(**kwargs)
@@ -27,8 +27,12 @@ class ConvergenceTest(object):
 
 		if plot:
 			self.plot()
+		if save:
+			self.saveIteration()
 
 		self.iter+=1
+
+		gc.collect()
 
 	def permute(self,permutationFunction):
 		if not permutationFunction is None:
@@ -81,13 +85,27 @@ class ConvergenceTest(object):
 
 	def save(self):
 		cols = [parameter for parameter,_,_,_ in self.scalarIntervals] + [str(ind) for ind,_,_,_ in self.functionIntervals]
-		df = pd.DataFrame(self.allChecks,columns=cols)
+		df = pd.DataFrame(np.array(self.allChecks).astype(int),columns=cols)
 		df.to_csv(os.path.join('testing',self.label,'checks.csv'))
+
+	def saveIteration(self):
+		odir = os.path.join('testing',self.label,str(self.iter))
+
+		self.m.parameter_history.to_csv(os.path.join(odir,'samples.csv'))
 
 	def plot(self):
 
 		if not str(self.iter) in os.listdir(os.path.join('testing',self.label)):
 			os.mkdir(os.path.join('testing',self.label,str(self.iter)))
+
+		plt.figure()
+		plt.plot(self.m.y,c='k',alpha=.5);
+		for i in range(self.m.mk[0]):
+			plt.plot(self.fsamples[:,0]+np.dot(self.fsamples[:,1:],self.m.contrasts[0][i,:]));
+		plt.tight_layout()
+		plt.savefig(os.path.join('testing',self.label,str(self.iter),'data.pdf'))
+		plt.close()
+
 
 		for parameter,_,_,_ in self.scalarIntervals:
 			ival = self.intervals[parameter]
@@ -98,7 +116,9 @@ class ConvergenceTest(object):
 			plt.plot(ival.samples)
 			plt.subplot(122)
 			ival.plot((-2,2),self.trueValues[parameter])
+			plt.tight_layout()
 			plt.savefig(os.path.join('testing',self.label,str(self.iter),'%s.pdf'%parameter))
+			plt.close()
 
 		for ind,_,_,_ in self.functionIntervals:
 			ival = self.intervals[ind]
@@ -116,7 +136,9 @@ class ConvergenceTest(object):
 			for i in range(diff.shape[0]):
 				plt.plot(abs(diff[i,:]),c=cmap(1.*i/diff.shape[0]));
 
+			plt.tight_layout()
 			plt.savefig(os.path.join('testing',self.label,str(self.iter),'f%d.pdf'%ind))
+			plt.close()
 
 
 if __name__ == "__main__":
@@ -133,7 +155,7 @@ if __name__ == "__main__":
 	cvg.addFunctionInterval(1,.95)
 
 	def permute(m):
-		m.parameter_cache['y_sigma'] = np.random.uniform(-1,1)
+		#m.parameter_cache['y_sigma'] = np.random.uniform(-1,1)
 
 		m.parameter_cache['prior0_sigma'] = np.random.uniform(-1,1)
 		m.parameter_cache['prior0_lengthscale'] = np.random.uniform(-1,1)
@@ -143,8 +165,10 @@ if __name__ == "__main__":
 
 		return m
 
-	for i in range(3):
-		cvg.iterate(nsample=100,thin=10,r=3,y_sigma=-2,plot=True,permutationFunction=permute,burnin=2)
+	for i in range(10):
+		if i % 10 == 0:
+			print i
+		cvg.iterate(nsample=10000,thin=10,n=10,r=2,y_sigma=-2,plot=True,save=True,permutationFunction=permute,burnin=200)
 		# print cvg.results()
 
 	cvg.save()
