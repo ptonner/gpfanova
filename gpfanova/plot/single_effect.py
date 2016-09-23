@@ -1,5 +1,4 @@
 from meta import *
-import numpy as np
 
 def plotSingleEffect(m,k,function=False,data=False,derivative=False,**kwargs):
 
@@ -80,7 +79,7 @@ def _plot_single_effect_function(m,k,subplots=None,_mean=False,offset=False,vari
 		else:
 			r = .4
 			c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
-
+			
 		samples = m.parameter_history[m.effectIndexToCache(k,j)].values[burnin:,:]
 		if offset:
 			samples += m.parameter_history[m.functionIndex(0)].values[burnin:,:]
@@ -159,4 +158,4 @@ def _plot_single_effect_data(m,k,subplots=False,alpha=1,empirical=True,individua
 				c = _cmap(r+(1-r)*(j+1)/(m.mk[k]+1))
 
 			plt.plot(m.x,m.y[:,i],color=c,alpha=alpha)
-	plt.ylim(np.nanmin(m.y),np.nanmax(m.y))
+	plt.ylim(m.y.min(),m.y.max())

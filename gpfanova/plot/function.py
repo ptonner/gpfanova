@@ -15,7 +15,7 @@ def plotFunctionSamples(samples,x=None,c='b',alpha=.2,burnin=0,interval=True,int
 
 	epsilon = 0
 	if interval:
-		epsilon = _interval.functionInterval(samples,**intervalKwargs)
+		epsilon,_ = _interval.functionInterval(samples,**intervalKwargs)
 
 	plt.plot(x,mean,color=c)
 	plt.fill_between(x,mean-2*std,mean+2*std,alpha=alpha,color=c)

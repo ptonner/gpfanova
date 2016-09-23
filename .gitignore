@@ -1,5 +1,4 @@
 *.png
-*.out
 *.pyc
 *.so
 *.c
@@ -14,6 +13,3 @@ lib/
 local/
 pip-selfcheck.json
 results/
-MANIFEST
-gpfanova.egg-info
-dist
