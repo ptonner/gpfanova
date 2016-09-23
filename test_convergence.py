@@ -19,11 +19,18 @@ class ConvergenceTest(object):
 		if not self.label in os.listdir('testing'):
 			os.mkdir(os.path.join('testing',self.label))
 
-	def iterate(self,plot=False,save=False,permutationFunction=None,**kwargs):
-		self.initialize(**kwargs)
-		self.permute(permutationFunction)
-		self.sample(**kwargs)
-		self.checkIntervals(**kwargs)
+	def iterate(self,plot=False,save=False,permutationFunction=None, initializeKwargs={},permuteKwargs={},sampleKwargs={},checkIntervalsKwargs={},**kwargs):
+
+		initializeKwargs.update(kwargs)
+		self.initialize(**initializeKwargs)
+
+		self.permute(permutationFunction,**permuteKwargs)
+
+		sampleKwargs.update(kwargs)
+		self.sample(**sampleKwargs)
+
+		checkIntervalsKwargs.update(kwargs)
+		self.checkIntervals(**checkIntervalsKwargs)
 
 		if plot:
 			self.plot()
@@ -100,8 +107,10 @@ class ConvergenceTest(object):
 
 		plt.figure()
 		plt.plot(self.m.y,c='k',alpha=.5);
-		for i in range(self.m.mk[0]):
-			plt.plot(self.fsamples[:,0]+np.dot(self.fsamples[:,1:],self.m.contrasts[0][i,:]));
+		#for i in range(self.m.mk[0]):
+			#plt.plot(self.fsamples[:,0]+np.dot(self.fsamples[:,1:],self.m.contrasts[0][i,:]));
+		for r in range(self.m.y.shape[1]):
+			plt.plot(np.dot(self.fsamples,self.m.design_matrix[r,:]));
 		plt.tight_layout()
 		plt.savefig(os.path.join('testing',self.label,str(self.iter),'data.pdf'))
 		plt.close()

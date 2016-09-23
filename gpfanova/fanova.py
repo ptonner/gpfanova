@@ -15,7 +15,21 @@ class FANOVA(Base):
 
 		self.effectTransforms = effectTransforms
 		self.interactionTransforms = interactionTransforms
-		self.interactions = interactions
+
+		if type(interactions) == bool:
+			self.interactions = interactions
+			self._interactions = {}
+			for i in range(self.k):
+				for j in range(i+1,self.k):
+					self._interactions[(i,j)] = True
+		elif type(interactions) == list:
+			self.interactions = True
+			self._interactions = {}
+			for i,j in interactions:
+				if j < i:
+					i,j = j,i
+				self._interactions[(i,j)] = True
+
 		self.helmertConvert = helmertConvert
 
 		self.contrasts = [self.buildEffectContrastMatrix(i) for i in range(self.k)]
@@ -31,7 +45,9 @@ class FANOVA(Base):
 		Base.__init__(self,x,y,*args,**kwargs)
 
 	def hasInteraction(self,i,k):
-		return self.interactions
+		if i > k:
+			i,k = k,i
+		return self.interactions and (i,k) in self._interactions
 
 	def effectSuffix(self,k):
 		if self.k <= len(FANOVA.EFFECT_SUFFIXES):
@@ -55,7 +71,7 @@ class FANOVA(Base):
 		for k in range(self.k):
 			for i in range(k+1,self.k):
 				if self.interactionTransforms:
-					if self.hasInteraction(i,k):
+					if self.hasInteraction(k,i):
 						for l in range(self.mk[k]):
 							for j in range(self.mk[i]):
 								ret.append(Transform('(%s,%s)_(%d,%d)'%(self.effectSuffix(k),self.effectSuffix(i),l,j),
@@ -222,6 +238,12 @@ class FANOVA(Base):
 		if k >= self.k:
 			return self.f
 
+		if not self.hasInteraction(i,k):
+			if i == k - 1:
+				return self.effectInteractionIndex(i,0,k+1,0)
+			else:
+				return self.effectInteractionIndex(i+1,0,k,0)
+
 		if j >= self.mk[i]:
 			import logging
 			logger = logging.getLogger(__name__)
@@ -263,7 +285,8 @@ class FANOVA(Base):
 		for i in range(self.k):
 			d += self.mk[i] - 1
 			for j in range(i):
-				if self.interactions:
+				#if self.interactions:
+				if self.hasInteraction(j,i):
 					d += (self.mk[i] - 1) * (self.mk[j] - 1)
 
 		x = np.zeros((self.m,d))
@@ -277,7 +300,8 @@ class FANOVA(Base):
 
 			for i in range(self.k):
 				for j in range(i+1,self.k):
-					if self.interactions:
+					#if self.interactions:
+					if self.hasInteraction(i,j):
 						z = self.effect[s,i] * self.mk[j] + self.effect[s,j]
 						x[s,ind:ind+(self.mk[i]-1)*(self.mk[j]-1)] = self.contrasts_interaction[(i,j)][z,:]
 						self._effectInteractionIndex[(i,j)] = ind
@@ -286,7 +310,8 @@ class FANOVA(Base):
 		return x
 
 	def relativeInteraction(self,i,j,k,l,i0=None,k0=None):
-		if not self.interactions:
+		#if not self.interactions:
+		if not self.hasInteraction(i,k):
 			return None
 
 		if i0 is None:
