@@ -6,6 +6,7 @@ import plot
 import sample
 import logging
 import interval
+import dataset
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
