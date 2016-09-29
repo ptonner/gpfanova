@@ -65,6 +65,8 @@ class FunctionInterval(Interval):
 		Interval.__init__(self,samples,alpha,ndim=2)
 
 		p = samples.shape[0]
+
+		# change alpha to be something actually achievable given the number of samples
 		alphaPotential = 1.*np.arange(self.n)/self.n
 		self.alpha = filter(lambda x: abs(x-self.alpha)==abs(self.alpha-alphaPotential).min(),alphaPotential)[0]
 
@@ -113,10 +115,8 @@ class FunctionInterval(Interval):
 
 		self.bounds = bounds
 
-		self.lb = self.mean - self.std - self.epsilon
-		self.ub = self.mean + self.std + self.epsilon
-
-		#return epsilon,bounds
+		self.lb = self.mean - 2*self.std - self.epsilon
+		self.ub = self.mean + 2*self.std + self.epsilon
 
 	def plot(self,x=None,alpha=.2,c='b'):
 		import matplotlib.pyplot as plt
