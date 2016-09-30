@@ -17,7 +17,7 @@ class ConvergenceTestInteractions(ConvergenceTest):
 
 if __name__ == "__main__":
 
-    import argparse
+    import argparse, time
     parser = argparse.ArgumentParser(description='Run convergence test for GP-FANOVA with interactions.')
     # parser.add_argument('strains',metavar=('s'), type=str, nargs='*',
     #                   help='strains to build model for')
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    cvg = ConvergenceTestInteractions('test-interactions-k2-mk2')
+    cvg = ConvergenceTestInteractions('test-interactions-k2-mk2-%s'%time.ctime().replace(" ","-"))
     cvg.addScalarInterval('y_sigma',.05,lambda x: cvg.m.observationLikelihood(sigma=x,prior_lb=-2,prior_ub=2))
     cvg.addScalarInterval('prior0_sigma',.05,lambda x: cvg.m.prior_likelihood(0,sigma=x,prior_lb=-2,prior_ub=2))
     cvg.addScalarInterval('prior0_lengthscale',.05,lambda x: cvg.m.prior_likelihood(0,lengthscale=x,prior_lb=-2,prior_ub=2))
@@ -60,9 +60,9 @@ if __name__ == "__main__":
     for f in range(cvg.m.f):
         cvg.addFunctionInterval(f,.95)
 
-    for i in range(100):
+    for i in range(50):
         if i % 10 == 0:
             print i
-        cvg.iterate(nsample=12000,thin=10,n=10,r=2,y_sigma=-2,k=k,interactions=interactions,plot=True,save=True,permutationFunction=permute,burnin=200)
+        cvg.iterate(nsample=10000,thin=10,n=10,r=2,y_sigma=-2,k=k,interactions=interactions,plot=True,save=True,permutationFunction=permute,burnin=200)
 
     cvg.save()

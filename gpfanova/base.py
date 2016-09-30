@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,*args,**kwargs):
+	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,designMatrix=None,priorGroups=None,*args,**kwargs):
 		""" Construct the base functional model.
 
 		Args:
@@ -33,8 +33,10 @@ class Base(SamplerContainer):
 		self.p = self.x.shape[1]
 		self.m = self.y.shape[1]
 
-		self.design_matrix = None
+		self.design_matrix = designMatrix
 		self.buildDesignMatrix()
+
+		self._priorGroups = priorGroups
 
 		# number of functions being estimated
 		self.f = self.design_matrix.shape[1]
@@ -138,7 +140,9 @@ class Base(SamplerContainer):
 		return self._observationIndexBaseList
 
 	def priorGroups(self):
-		raise NotImplementedError("Implement a prior grouping function for your model!")
+		if self._priorGroups==None:
+			raise NotImplementedError("Implement a prior grouping function for your model!")
+		return self._priorGroups
 
 	def _priorParameters(self,i):
 		if i < 0:
@@ -255,5 +259,88 @@ class Base(SamplerContainer):
 
 		## put into data
 		y = np.dot(self.design_matrix,samples) + np.random.normal(0,np.sqrt(pow(10,self.parameter_cache['y_sigma'])),size=(self.m,self.n))
+
+		return y.T,samples.T
+
+class Base_withReplicate(Base):
+
+	def __init__(self,*args,**kwargs):
+		Base.__init__(self,*args,**kwargs)
+
+		self.replicateKernel = RBF(self,['replicate_sigma','replicate_lengthscale'],logspace=True)
+
+	def observationLikelihood(self,sigma=None,prior_ub=None,prior_lb=None,replicateSigma=None,replicateLengthscale=None):
+		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
+
+		# y = np.ravel(self.y.T)
+		y = self.y
+		mu = self.observationMean()
+
+		mu = mu.reshape((self.m,self.n)).T
+
+		var = None
+
+		if sigma is None:
+			sigma = self.parameter_cache['y_sigma']
+
+			if replicateSigma is None:
+				var = replicateLengthscale
+			else:
+				var = replicateSigma
+
+			sigma = pow(10,sigma)
+			sigma = pow(sigma,.5)
+		else:
+			sigma = pow(10,sigma)
+			sigma = pow(sigma,.5)
+			var= sigma
+
+		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
+		priorll = priorRv.logpdf(var)
+
+		sigma = np.eye(self.n)*sigma
+
+		k = self.replicateKernel.K(self.x,replicateSigma,replicateLengthscale)
+		sigma += k
+
+		# remove missing values
+		# mu = mu[~np.isnan(y)]
+		# y = y[~np.isnan(y)]
+
+		ll = priorll
+		rv = scipy.stats.multivariate_normal(np.zeros(self.n),sigma)
+		for i in range(self.m):
+			# print ll,scipy.stats.multivariate_normal.logpdf(y[:,i]-mu[:,i],np.zeros(self.n),sigma)
+			# ll += scipy.stats.multivariate_normal.logpdf(y[:,i]-mu[:,i],np.zeros(self.n),sigma)
+			ll += rv.logpdf(y[:,i]-mu[:,i])
+
+		return ll
+		# return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma)) + priorll
+
+	def _additionalSamplers(self):
+		samplers = []
+
+		w,m = .1,10
+		samplers.append(Slice('replicate_sigma','replicate_sigma',lambda x: self.observationLikelihood(replicateSigma=x,prior_lb=-1,prior_ub=1),w,m))
+
+		samplers.append(Slice('replicate_lengthscale','replicate_lengthscale',lambda x: self.observationLikelihood(replicateLengthscale=x,prior_lb=-2,prior_ub=2),w,m))
+
+		return samplers
+
+	def samplePrior(self,):
+
+		# sample the hyperparameters
+
+		## sample the latent functions
+		samples = np.zeros((self.f,self.n))
+		for i in range(self.f):
+			mu = np.zeros(self.n)
+			cov = self.kernels[self.functionPrior(i)].K(self.x)
+			samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
+
+		## put into data
+		sigma = np.eye(self.n)*np.sqrt(pow(10,self.parameter_cache['y_sigma']))
+		sigma += self.replicateKernel.K(self.x)
+		y = np.dot(self.design_matrix,samples) + scipy.stats.multivariate_normal.rvs(np.zeros(self.n),sigma,size=(self.m))
 
 		return y.T,samples.T

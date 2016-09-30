@@ -90,10 +90,14 @@ class ConvergenceTest(object):
 
 		self.allChecks.append(chex)
 
-	def save(self):
+	def save(self,save=None):
+		if type(save) == str:
+			fname = save
+		else:
+			fname = 'checks.csv'
 		cols = [parameter for parameter,_,_,_ in self.scalarIntervals] + [str(ind) for ind,_,_,_ in self.functionIntervals]
 		df = pd.DataFrame(np.array(self.allChecks).astype(int),columns=cols)
-		df.to_csv(os.path.join('testing',self.label,'checks.csv'))
+		df.to_csv(os.path.join('testing',self.label,fname))
 
 	def saveIteration(self):
 		odir = os.path.join('testing',self.label,str(self.iter))
