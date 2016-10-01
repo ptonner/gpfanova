@@ -1,6 +1,6 @@
 from patsy.contrasts import Sum
 from sample import SamplerContainer, Gibbs, Slice, Fixed, Function, FunctionDerivative
-from kernel import RBF, White
+from kernel import RBF, White, Addition
 import numpy as np
 import scipy.stats, logging
 
@@ -269,6 +269,8 @@ class Base_withReplicate(Base):
 
 		self.replicateKernel = RBF(self,['replicate_sigma','replicate_lengthscale'],logspace=True)
 
+		self.y_k = Addition(self.y_k,self.replicateKernel,self,logspace=True)
+
 	def observationLikelihood(self,sigma=None,prior_ub=None,prior_lb=None,replicateSigma=None,replicateLengthscale=None):
 		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
 
@@ -287,21 +289,20 @@ class Base_withReplicate(Base):
 				var = replicateLengthscale
 			else:
 				var = replicateSigma
-
-			sigma = pow(10,sigma)
-			sigma = pow(sigma,.5)
 		else:
-			sigma = pow(10,sigma)
-			sigma = pow(sigma,.5)
 			var= sigma
+
+		# sigma = pow(10,sigma)
+		# sigma = pow(sigma,.5)
 
 		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
 		priorll = priorRv.logpdf(var)
 
-		sigma = np.eye(self.n)*sigma
+		# sigma = np.eye(self.n)*sigma
+		sigma = self.y_k.K(self.x,k1_sigma=sigma,k2_sigma=replicateSigma,k2_lengthscale=replicateLengthscale)
 
-		k = self.replicateKernel.K(self.x,replicateSigma,replicateLengthscale)
-		sigma += k
+		# k = self.replicateKernel.K(self.x,replicateSigma,replicateLengthscale)
+		# sigma += k
 
 		# remove missing values
 		# mu = mu[~np.isnan(y)]
