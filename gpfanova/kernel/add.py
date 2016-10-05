@@ -10,20 +10,9 @@ class Addition(Kernel):
             params.extend(k.parameters)
         Kernel.__init__(self,model,params,*args,**kwargs)
 
-    def _K(self,X,*args,**kwargs):
+    def _K(self,X,*args):
 
-        kw = {}
-        for k in kwargs.keys():
-            if k[:3] == 'k1_':
-                kw[k[3:]] = kwargs[k]
-
-        k1 = self.k1.K(X,**kw)
-
-        kw = {}
-        for k in kwargs.keys():
-            if k[:3] == 'k2_':
-                kw[k[3:]] = kwargs[k]
-
-        k2 = self.k2.K(X,**kw)
+        k1 = self.k1.K(X,*args[:len(self.k1.parameters)])
+        k2 = self.k2.K(X,*args[len(self.k1.parameters):])
 
         return k1 + k2

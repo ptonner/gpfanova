@@ -322,7 +322,7 @@ class Base_withReplicate(Base):
 		priorll = priorRv.logpdf(var)
 
 		# sigma = np.eye(self.n)*sigma
-		sigma = self.y_k.K(self.x,k1_sigma=sigma,k2_sigma=replicateSigma,k2_lengthscale=replicateLengthscale)
+		sigma = self.y_k.K(self.x,y_sigma=sigma,replicate_sigma=replicateSigma,replicate_lengthscale=replicateLengthscale)
 
 		# k = self.replicateKernel.K(self.x,replicateSigma,replicateLengthscale)
 		# sigma += k
