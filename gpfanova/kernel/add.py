@@ -12,7 +12,7 @@ class Addition(Kernel):
 
     def _K(self,X,*args):
 
-        k1 = self.k1.K(X,*args[:len(self.k1.parameters)])
-        k2 = self.k2.K(X,*args[len(self.k1.parameters):])
+        k1 = self.k1._K(X,*args[:len(self.k1.parameters)])
+        k2 = self.k2._K(X,*args[len(self.k1.parameters):])
 
         return k1 + k2
