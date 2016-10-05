@@ -13,7 +13,7 @@ class Base(SamplerContainer):
 	where each list defines a grouping of functions who share a GP prior.
 	"""
 
-	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,designMatrix=None,priorGroups=None,*args,**kwargs):
+	def __init__(self,x,y,hyperparam_kwargs={},derivatives=False,designMatrix=None,priorGroups=None,bounds={},*args,**kwargs):
 		""" Construct the base functional model.
 
 		Args:
@@ -56,7 +56,11 @@ class Base(SamplerContainer):
 			w,m = hyperparam_kwargs['y_sigma']
 		elif 'sigma' in hyperparam_kwargs:
 			w,m = hyperparam_kwargs['sigma']
-		samplers = [Slice('y_sigma','y_sigma',lambda x: self.observationLikelihood(sigma=x,prior_lb=-2,prior_ub=2),w,m)]
+
+		lb,ub = -2,2
+		if 'y_sigma' in bounds:
+			lb,ub = bounds['y_sigma']
+		samplers = [Slice('y_sigma','y_sigma',lambda x,lb=lb,ub=ub: self.observationLikelihood(sigma=x,prior_lb=lb,prior_ub=ub),w,m)]
 
 		# function priors
 		self.kernels = []
@@ -77,12 +81,18 @@ class Base(SamplerContainer):
 			w,m = .1,10
 			if 'sigma' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['sigma']
-			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i: self.prior_likelihood(p=p,sigma=x,prior_lb=-2,prior_ub=2),w,m))
+			lb,ub = -2,2
+			if 'prior%d_sigma'%i in bounds:
+				lb,ub = bounds['prior%d_sigma'%i]
+			samplers.append(Slice('prior%d_sigma'%i,'prior%d_sigma'%i,lambda x,p=i,lb=lb,ub=ub: self.prior_likelihood(p=p,sigma=x,prior_lb=lb,prior_ub=ub),w,m))
 
 			w,m = .1,10
 			if 'lengthscale' in hyperparam_kwargs:
 				w,m = hyperparam_kwargs['lengthscale']
-			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i: self.prior_likelihood(p=p,lengthscale=x,prior_lb=-2,prior_ub=2),w,m))
+			lb,ub = -2,2
+			if 'prior%d_lengthscale'%i in bounds:
+				lb,ub = bounds['prior%d_lengthscale'%i]
+			samplers.append(Slice('prior%d_lengthscale'%i,'prior%d_lengthscale'%i,lambda x,p=i,lb=lb,ub=ub: self.prior_likelihood(p=p,lengthscale=x,prior_lb=lb,prior_ub=ub),w,m))
 		samplers.extend(self._additionalSamplers())
 
 		SamplerContainer.__init__(self,samplers,**kwargs)
@@ -268,8 +278,21 @@ class Base_withReplicate(Base):
 		Base.__init__(self,*args,**kwargs)
 
 		self.replicateKernel = RBF(self,['replicate_sigma','replicate_lengthscale'],logspace=True)
-
 		self.y_k = Addition(self.y_k,self.replicateKernel,self,logspace=True)
+
+		if 'replicateLengthscaleBounds' in kwargs:
+			self.replicateLengthscaleBounds = kwargs['replicateLengthscaleBounds']
+			b = self.replicateLengthscaleBounds
+			self.parameter_cache.replicate_lengthscale = 1.*(b[0]+b[1])/2
+		else:
+			self.replicateLengthscaleBounds = (-1,1)
+
+		if 'replicateSigmaBounds' in kwargs:
+			self.replicateSigmaBounds = kwargs['replicateSigmaBounds']
+			b = self.replicateSigmaBounds
+			self.parameter_cache.replicate_sigma = 1.*(b[0]+b[1])/2
+		else:
+			self.replicateSigmaBounds = (-1,1)
 
 	def observationLikelihood(self,sigma=None,prior_ub=None,prior_lb=None,replicateSigma=None,replicateLengthscale=None):
 		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
@@ -322,9 +345,9 @@ class Base_withReplicate(Base):
 		samplers = []
 
 		w,m = .1,10
-		samplers.append(Slice('replicate_sigma','replicate_sigma',lambda x: self.observationLikelihood(replicateSigma=x,prior_lb=-1,prior_ub=1),w,m))
+		samplers.append(Slice('replicate_sigma','replicate_sigma',lambda x: self.observationLikelihood(replicateSigma=x,prior_lb=self.replicateSigmaBounds[0],prior_ub=self.replicateSigmaBounds[1]),w,m))
 
-		samplers.append(Slice('replicate_lengthscale','replicate_lengthscale',lambda x: self.observationLikelihood(replicateLengthscale=x,prior_lb=-2,prior_ub=2),w,m))
+		samplers.append(Slice('replicate_lengthscale','replicate_lengthscale',lambda x: self.observationLikelihood(replicateLengthscale=x,prior_lb=self.replicateLengthscaleBounds[0],prior_ub=self.replicateLengthscaleBounds[1]),w,m))
 
 		return samplers
 
@@ -340,8 +363,9 @@ class Base_withReplicate(Base):
 			samples[i,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
 		## put into data
-		sigma = np.eye(self.n)*np.sqrt(pow(10,self.parameter_cache['y_sigma']))
-		sigma += self.replicateKernel.K(self.x)
+		# sigma = np.eye(self.n)*np.sqrt(pow(10,self.parameter_cache['y_sigma']))
+		# sigma += self.replicateKernel.K(self.x)
+		sigma = self.y_k.K(self.x)
 		y = np.dot(self.design_matrix,samples) + scipy.stats.multivariate_normal.rvs(np.zeros(self.n),sigma,size=(self.m))
 
 		return y.T,samples.T
