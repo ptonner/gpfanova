@@ -11,11 +11,11 @@ class DataSet(object):
         self.meta = pd.read_csv(os.path.join(dir,meta))
         self.data = pd.read_csv(os.path.join(dir,data),index_col=timecol)
 
-        assert self.data.shape[1] == self.meta.shape[0], 'frames do no match'
+        assert self.data.shape[1] == self.meta.shape[0], 'frames do no match, %d x %d' % (self.data.shape[1], self.meta.shape[0])
 
         self.data.columns = self.meta.index
 
-    def build(self,effects=[],covariates=[]):
+    def build(self,effects=[],covariates=[],scale=None,**kwargs):
 
         if 'x' in covariates:
             covariates.remove('x')
@@ -32,13 +32,34 @@ class DataSet(object):
                             index=['x']+covariates,
                             columns=['rep'])
 
-            x = pd.DataFrame(np.array(pivot.index.tolist()),columns=['x']+covariates)
+            x = pd.DataFrame(np.array(pivot.index.tolist()),columns=['x']+covariates).values
             y = pivot.values
 
         else:
-            x = pd.DataFrame(self.data.index.values,columns=['x'])
+            x = pd.DataFrame(self.data.index.values,columns=['x']).values
             y = self.data.values
 
         effect = self.meta[effects]
+        labels = []
 
-        return x,y,effect
+        select = [True]*self.meta.shape[0]
+        for k in kwargs.keys():
+            if k in self.meta:
+                if type(kwargs[k]) == list:
+                    select = (select) & (self.meta[k].apply(lambda x: x in kwargs[k]))
+                else:
+                    select = (select) & (self.meta[k] == kwargs[k])
+        y = y[:,np.where(select)[0]]
+        effect = effect.loc[select,:]
+
+        for e in effect.columns:
+            temp,l = pd.factorize(effect[e])
+            effect[e] = temp
+            labels.append(l.tolist())
+
+        if scale=='range':
+            x = (x-x.min())/(x.max()-x.min())
+        elif scale=='norm':
+            x = (x-x.mean())/x.std()
+
+        return x,y,effect,labels
