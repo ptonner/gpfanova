@@ -10,7 +10,7 @@ class Prior(object):
 		assert issubclass(type(self._functions),list), 'must provide a list of functions!'
 
 		try:
-			self._functions = [int(f) for f in self._functions]
+			self._functions = [int(z) for z in self._functions]
 		except:
 			raise ValueError("must provide list of intergers for functions!")
 
@@ -43,7 +43,7 @@ class Prior(object):
 
 		samplers = []
 		for f in self._functions:
-			samplers.append(Function('%d'%f,self.x,self.base,f,self.kernel))
+			samplers.append(Function('%d'%f,self.base.functionIndex(f),self.base,f,self.kernel))
 
 			if self.derivatives:
 				for d in range(self.p):
@@ -57,7 +57,7 @@ class Prior(object):
 		w,m = .1,10
 		samplers = []
 		for p in self.kernel.parameters:
-			samplers.append(Slice(p,p,lambda x: self.loglikelihood(**{p:x}),w,m))
+			samplers.append(Slice(p,p,lambda x: self.loglikelihood(prior_lb=-2,prior_ub=2,**{p:x}),w,m))
 
 		return samplers
 
@@ -68,13 +68,13 @@ class Prior(object):
 		"""Sample functions from this prior."""
 		samples = np.zeros((self.f,self.n))
 
+		mu = np.zeros(self.n)
+		cov = self.kernel.K(self.x)
+		L = linalg.jitchol(cov)
+		cov = np.dot(L,L.T)
+
 		for f in self._functions:
-
-			mu = np.zeros(self.n)
-			cov = self.kernel.K(self.x)
-			L = linalg.jitchol(cov)
-			cov = np.dot(L,L.T)
-
+			
 			samples[f,:] = scipy.stats.multivariate_normal.rvs(mu,cov)
 
 		return samples
@@ -91,7 +91,7 @@ class Prior(object):
 		ll = 0
 		for f in self._functions:
 			try:
-				ll += rv.logpdf(self.base.get(self.base.functionIndex(f)))
+				ll += rv.logpdf(self.base.parameterCurrent(str(f)))
 			except np.linalg.LinAlgError:
 				logger = logging.getLogger(__name__)
 				logger.error("prior likelihood LinAlgError (%d,%d)" % (p,f))
