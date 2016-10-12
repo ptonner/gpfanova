@@ -97,6 +97,10 @@ class Base(SamplerContainer):
 
 		SamplerContainer.__init__(self,samplers,**kwargs)
 
+		for k in bounds.keys():
+			if k in self.parameter_cache:
+				self.parameter_cache[k] = sum(bounds[k])*1./2
+
 	def _additionalSamplers(self):
 		"""Additional samplers for the model, can be overwritten by subclasses."""
 		return []
@@ -213,6 +217,10 @@ class Base(SamplerContainer):
 
 	def observationLikelihood(self,sigma=None,prior_ub=None,prior_lb=None):
 		"""Compute the conditional likelihood of the observations y given the design matrix and latent functions"""
+
+		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
+		priorll = priorRv.logpdf(sigma)
+
 		y = np.ravel(self.y.T)
 		mu = self.observationMean()
 		sigma = pow(10,sigma)
@@ -221,9 +229,6 @@ class Base(SamplerContainer):
 		# remove missing values
 		mu = mu[~np.isnan(y)]
 		y = y[~np.isnan(y)]
-
-		priorRv = scipy.stats.uniform(prior_lb,prior_ub-prior_lb)
-		priorll = priorRv.logpdf(sigma)
 
 		return np.sum(scipy.stats.norm.logpdf(y-mu,0,sigma)) + priorll
 
