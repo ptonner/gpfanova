@@ -25,7 +25,7 @@ class FunctionSampler(Sampler):
 
         self.indices = []
         for l in self.likelihoods:
-            self.indices.append(l.parameters.keys().index(self.parameter.name))
+            self.indices.append(l.parameters.parameters.keys().index(self.parameter.name))
 
     def residual(self,):
         n = []
