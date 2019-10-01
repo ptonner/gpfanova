@@ -44,7 +44,7 @@ python-dateutil==2.5.3
 pytz==2016.4
 pyzmq==15.2.0
 qtconsole==4.2.1
-requests==2.10.0
+requests==2.20.0
 scipy==0.17.1
 simplegeneric==0.8.1
 singledispatch==3.4.0.3
