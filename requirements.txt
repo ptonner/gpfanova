@@ -18,7 +18,7 @@ ipyparallel==5.1.0
 ipython==4.2.0
 ipython-genutils==0.1.0
 ipywidgets==5.1.5
-Jinja2==2.8
+Jinja2==2.11.3
 jsonschema==2.5.1
 jupyter-client==4.3.0
 jupyter-core==4.1.0
